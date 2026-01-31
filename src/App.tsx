@@ -1169,7 +1169,13 @@ const App: React.FC = () => {
           <div className="flex items-center gap-3">
             {step === AppStep.PREVIEW ? (
               <button
-                onClick={() => setStep(previousStep)}
+                onClick={() => {
+                  if (invoiceData.isFinalized) {
+                    resetInvoice();
+                  } else {
+                    setStep(previousStep);
+                  }
+                }}
                 className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-xl font-black uppercase text-[10px] flex items-center gap-2 shadow-lg active:scale-95 transition-all"
               >
                 <X size={18} strokeWidth={3} /> Fermer

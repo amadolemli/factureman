@@ -153,11 +153,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
         }
     };
 
-    const filteredUsers = users.filter(u =>
-        (u.business_name || 'Sans Nom').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.id.includes(searchTerm) ||
-        (u.phone && u.phone.includes(searchTerm))
-    );
+    const filteredUsers = users.filter(u => {
+        const term = searchTerm.toLowerCase().trim();
+        const phoneTerm = term.replace(/\s+/g, ''); // Allow searching "7000" matching "70 00 ..."
+
+        const nameMatch = (u.business_name || 'Sans Nom').toLowerCase().includes(term);
+        const idMatch = u.id.toLowerCase().includes(term);
+
+        const userPhoneClean = (u.phone || '').replace(/\s+/g, '');
+        const phoneMatch = userPhoneClean.includes(phoneTerm);
+
+        return nameMatch || idMatch || phoneMatch;
+    });
 
     // Use createPortal to break out of any parent stacking context (z-index traps)
     return createPortal(
@@ -235,7 +242,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                             <input
                                                 type="text"
-                                                placeholder="Chercher par nom ou ID..."
+                                                placeholder="Nom, Téléphone ou ID..."
                                                 className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                                                 value={searchTerm}
                                                 onChange={e => setSearchTerm(e.target.value)}
@@ -287,15 +294,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
                                                 </div>
                                                 <div>
                                                     <div className="font-bold text-gray-900 flex items-center gap-2">
-                                                        {user.business_name || 'Sans Nom'}
+                                                        {(user.business_name && user.business_name !== 'Ma Nouvelle Boutique' && user.business_name !== 'Utilisateur Sans Nom')
+                                                            ? user.business_name
+                                                            : (user.phone || user.business_name || 'Inconnu')}
+
                                                         <span className="text-[10px] text-gray-500 font-normal">
-                                                            {user.phone ? `(${user.phone.slice(-4)})` : ''}
+                                                            {/* If we showed phone as title, don't show it here redundancy, unless we want to show it's a phone */}
+                                                            {(user.business_name && user.business_name !== 'Ma Nouvelle Boutique' && user.business_name !== 'Utilisateur Sans Nom') && user.phone ? `(${user.phone.slice(-4)})` : ''}
                                                         </span>
                                                         {user.is_super_admin && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1"><Star size={8} fill="currentColor" /> SUPER ADMIN</span>}
                                                         {!user.is_super_admin && user.is_admin && <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">ADMIN</span>}
                                                         {user.is_banned && <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full">BLOQUÉ</span>}
                                                     </div>
-                                                    <div className="text-xs text-gray-400 font-mono">{user.phone || user.id}</div>
+                                                    <div className="text-xs text-gray-400 font-mono">
+                                                        {(user.business_name && user.business_name !== 'Ma Nouvelle Boutique' && user.business_name !== 'Utilisateur Sans Nom') ? (user.phone || user.id) : user.id}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end gap-2">

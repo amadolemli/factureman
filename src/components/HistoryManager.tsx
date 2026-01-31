@@ -18,14 +18,35 @@ interface Props {
 
 const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, onConvert }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<DocumentType | 'ALL'>('ALL');
   const [activeConvertId, setActiveConvertId] = useState<string | null>(null);
 
+  // Helper to safely format date for search comparison
+  const formatDateForSearch = (isoString: string) => {
+    try {
+      return new Date(isoString).toLocaleDateString('fr-FR');
+    } catch {
+      return '';
+    }
+  };
+
   const filteredHistory = history
-    .filter(item =>
-      item.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.number.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    ;
+    .filter(item => {
+      const term = searchTerm.toLowerCase();
+      const total = item.items.reduce((acc, i) => acc + (i.quantity * i.unitPrice), 0).toString();
+
+      const matchesSearch =
+        item.customerName.toLowerCase().includes(term) ||
+        item.number.toLowerCase().includes(term) ||
+        (item.customerPhone && item.customerPhone.includes(term)) ||
+        formatDateForSearch(item.date).includes(term) ||
+        total.includes(term);
+
+      const matchesType = filterType === 'ALL' || item.type === filterType;
+
+      return matchesSearch && matchesType;
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const getBadgeColors = (type: DocumentType) => {
     switch (type) {
@@ -43,7 +64,7 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 sticky top-0 z-30">
         <div className="flex items-center gap-3 mb-4">
           <div className="bg-blue-900 p-2 rounded-lg">
             <Clock className="text-white" size={20} />
@@ -54,15 +75,40 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
           </div>
         </div>
 
-        <div className="relative">
+        <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
-            placeholder="Chercher client ou N°..."
-            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+            placeholder="Client, N°, Tél, Date..."
+            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+          <button
+            onClick={() => setFilterType('ALL')}
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase whitespace-nowrap transition-colors border ${filterType === 'ALL'
+              ? 'bg-blue-900 text-white border-blue-900'
+              : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+              }`}
+          >
+            Tout voir
+          </button>
+          {Object.values(DocumentType).map((type) => (
+            <button
+              key={type}
+              onClick={() => setFilterType(type)}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase whitespace-nowrap transition-colors border ${filterType === type
+                ? getBadgeColors(type).replace('bg-', 'bg-opacity-100 bg-').replace('text-', 'text-white text-').split(' ')[0] + ' text-white border-transparent'
+                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                }`}
+              style={filterType === type ? { backgroundColor: type === DocumentType.RECEIPT ? '#16a34a' : 'rgb(30, 58, 138)' } : {}}
+            >
+              {type}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -131,7 +177,7 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
                         </button>
 
                         {activeConvertId === item.id && (
-                          <div className="absolute right-0 bottom-full mb-2 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-2 w-48 animate-in zoom-in duration-200">
+                          <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl z-20 p-2 w-48 animate-in zoom-in duration-200">
                             <div className="flex justify-between items-center px-2 py-1 mb-1 border-b">
                               <span className="text-[8px] font-black uppercase text-gray-400">Convertir vers :</span>
                               <button onClick={() => setActiveConvertId(null)}><X size={12} /></button>

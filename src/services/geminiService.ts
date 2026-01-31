@@ -4,142 +4,66 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // Initialize the API with the key from environment variables
 // Initialize lazily
 
+import { supabase } from "./supabaseClient";
+
 export const extractItemsFromImage = async (base64Data: string, mimeType: string = "image/jpeg", context: string = ""): Promise<any> => {
-  // Note: Gemini uses API key from env or similar, here we assume it's hardcoded or from stored
-  // Ideally we should use user_gemini_api_key if we switched to that model. 
-  // The current geminiService probably used a hardworking key or env var. 
-  // Wait, the previous logic used localStorage for Gemini too? 
-  // Let's check the header of geminiService (I can't see it now but I'll assume similar pattern).
-  // Actually, I'll essentially rewrite the prompt construction part.
-
-  const apiKey = localStorage.getItem('user_gemini_api_key') || "";
-  // If no key, we might fallback to a default if it was hardcoded before, but the new UI implies User Key.
-
-
-
-  // ... Implementation of fetch using Google AI Studio API ...
-  // Since I don't want to break the existing Gemini service which might have specific Google implementation details 
-  // (GenerativeAI client vs REST), I will use 'view_file' on gemini first to be safe, 
-  // OR just update the signature and prompt if I am confident.
-  // I previously saw 'services/geminiService' being imported. 
-  // To be safe, I'd rather view it first, BUT I am limited in steps. 
-  // I will try to apply the change carefully.
-
-  // Actually, let's just update the signature and the start of the function where prompt is defined.
-  // I'll assume standard REST or client usage.
-
-  // 1. Récupérer la clé depuis le stockage utilisateur (prioritaire) ou l'environnement
-  const storedKey = localStorage.getItem('user_gemini_api_key');
-  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
-  const API_KEY = (storedKey || envKey || "").trim();
-
   try {
-    if (!API_KEY) {
-      console.warn("API Key not found. Using DEMO mode.");
-      // Simulation pour la démo
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return {
-        customerName: "Client Demo",
-        date: new Date().toISOString().split('T')[0],
-        items: [
-          { description: "Ciment (Scan Auto)", quantity: 10, unitPrice: 5000 },
-          { description: "Fer à béton (Scan Auto)", quantity: 5, unitPrice: 3500 },
-        ]
-      };
-    }
+    console.log("Using Secure Global Key (Server Proxy)...");
 
+    // Get Auth Token
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Authentification requise pour le scan.");
 
-    const genAI = new GoogleGenerativeAI(API_KEY);
+    // --- PRIMARY PATH: SECURE BACKEND CALL ---
+    try {
+      const response = await fetch('/api/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ base64Data, mimeType, context })
+      });
 
-    // Unified General Prompt (User Preference)
-    // Unified General Prompt (User Preference)
-    // Prompt Simplifié (Demandé par l'utilisateur)
-    let prompt = `
-      RÔLE : Assistant OCR simple et précis.
-      TÂCHE : Transcrire le document (Facture, Devis, Liste) en JSON.
-
-      RÈGLES DE LECTURE :
-      1. TEXTE VISIBLE : Lis exactement ce qui est écrit sur l'image.
-      2. CORRECTION FRANÇAISE : Si un mot est légèrement mal écrit ou flou, corrige-le UNIQUEMENT s'il correspond clairement à un mot existant en langue Française (ex: "Tomat" -> "Tomate").
-      3. MOTS INCONNUS : Si le mot ne ressemble à aucun mot français connu (code, référence, nom propre, abréviation inconnue), transcris-le EXACTEMENT comme tu le vois (lettre par lettre).
-      4. NE PAS INVENTER : N'ajoute pas de mots qui ne sont pas physiquement sur l'image.
-
-      ${context ? `CONTEXTE (Optionnel) : L'utilisateur vend : ${context}. (Utilise ceci uniquement si ça aide à lire un mot illisible).` : ""}
-
-      SORTIE JSON ATTENDUE :
-      {
-        "customerName": "Nom (ou vide)",
-        "date": "YYYY-MM-DD (ou date d'aujourd'hui)",
-        "items": [
-          { "description": "Texte lu", "quantity": Nombre, "unitPrice": Nombre }
-        ]
+      if (response.ok) {
+        return await response.json();
+      } else {
+        // If server returns error, we might fallback if in DEV, otherwise throw.
+        const errorText = await response.text();
+        console.warn("Backend Scan Failed:", errorText);
+        throw new Error(errorText);
       }
-    `;
+    } catch (serverError: any) {
+      // --- FALLBACK FOR LOCAL DEV (When /api/ does not exist) ---
+      // Only if we are in dev mode and have a local key
+      const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (envKey) {
+        console.warn("Server Proxy failed (likely local dev). Falling back to Local VITE Key.");
+        const genAI = new GoogleGenerativeAI(envKey);
 
-    const mediaPart = {
-      inlineData: {
-        data: base64Data,
-        mimeType: mimeType,
-      },
-    };
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    // Models to try in order
-    const candidateModels = [
-      "gemini-2.0-flash",
-      "gemini-2.0-flash-exp",
-      "gemini-2.5-flash-test", // Fallback for 2.5 if needed
-      "gemini-1.5-flash",
-      "gemini-1.5-flash-001",
-      "gemini-1.5-pro",
-      "gemini-pro"
-    ];
+        let prompt = `RÔLE : Assistant OCR simple et précis. TÂCHE : Transcrire le document (Facture, Devis, Liste) en JSON.
+         SORTIE JSON ATTENDUE : { "customerName": "Nom", "date": "YYYY-MM-DD", "items": [{ "description": "Texte", "quantity": 1, "unitPrice": 0 }] }`;
 
-    let model = null;
-    let result = null;
-    let lastError = null;
+        if (context) prompt += ` CONTEXTE: ${context}`;
 
-    for (const modelName of candidateModels) {
-      try {
-        console.log("Tentative avec le modèle:", modelName);
-        model = genAI.getGenerativeModel({ model: modelName });
-        result = await model.generateContent([prompt, mediaPart]);
-        break; // Success
-      } catch (e: any) {
-        console.warn(`Modèle ${modelName} échoué:`, e.message);
-        lastError = e;
-        if (e.message?.includes("API key") || e.message?.includes("403")) throw e;
+        const result = await model.generateContent([
+          prompt,
+          { inlineData: { data: base64Data, mimeType: mimeType } }
+        ]);
+
+        const text = (await result.response).text();
+        const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
+        return JSON.parse(cleaned);
       }
+
+      throw serverError; // Re-throw the original server error if no fallback
     }
-
-    if (!result) throw lastError || new Error("Aucun modèle n'a fonctionné (Erreur 404/500).");
-
-    const response = await result.response;
-    const text = response.text();
-
-    console.log("Gemini Raw Response:", text);
-
-    // Clean up markdown if present (just in case)
-    const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-
-    const data = JSON.parse(cleanedText);
-    return data;
 
   } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    console.warn("Falling back to DEMO mode due to API error.");
-
-    // Fallback Demo Data en cas d'erreur API
-    return {
-      customerName: "Client (Erreur)",
-      date: new Date().toISOString().split('T')[0],
-      items: [
-        {
-          description: `Erreur Scan: ${error instanceof Error ? error.message : String(error)}`.slice(0, 100),
-          quantity: 1,
-          unitPrice: 0
-        }
-      ]
-    };
+    console.error("OCR Error:", error);
+    throw error;
   }
 };
 

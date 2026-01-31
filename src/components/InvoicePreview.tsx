@@ -76,7 +76,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
 
         <div className="flex flex-col md:flex-row justify-between items-start mb-6 text-sm font-bold gap-4">
           <div className="w-full md:w-auto">
-            <span>Fait à {maskText(data.business.city)}, le {maskDate(data.date)}</span>
+            <span>Fait le {maskDate(data.date)}</span>
             <div className="mt-2 space-y-1">
               <div>
                 {isReceipt ? "REÇU DE :" : "DOIT :"}

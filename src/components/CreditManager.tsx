@@ -764,7 +764,7 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
               <FileSignature size={16} className="text-blue-500" /> Contrats & Historique
             </h4>
             <div className="space-y-3">
-              {selectedCustomer.history.map((h) => (
+              {selectedCustomer.history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((h) => (
                 <div key={h.id} className="bg-white p-4 rounded-2xl border border-gray-50 shadow-sm flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-xl ${h.type === 'INVOICE' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>

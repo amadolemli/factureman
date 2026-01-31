@@ -24,6 +24,17 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
         return `${countryCode}${cleanPhone}`;
     };
 
+    // Clear reset mode on mount and when leaving reset flow
+    React.useEffect(() => {
+        localStorage.removeItem('reset_mode');
+    }, []);
+
+    React.useEffect(() => {
+        if (step === 'HOME' || step === 'LOGIN_PHONE' || step === 'LOGIN_PASSWORD') {
+            localStorage.removeItem('reset_mode');
+        }
+    }, [step]);
+
     // --- SHARED ACTIONS ---
 
     const checkUserExists = async (targetPhone: string) => {
@@ -116,6 +127,9 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
         setError(null);
 
         try {
+            // SET FLAG FOR APP.TSX TO SHOW PASSWORD MODAL (FORCE PASSWORD CREATION)
+            localStorage.setItem('reset_mode', 'true');
+
             const finalPhone = getFormattedPhone();
             const { error } = await supabase.auth.verifyOtp({
                 phone: finalPhone,
@@ -124,32 +138,13 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
             });
 
             if (error) throw error;
-            setStep('REGISTER_PASSWORD'); // Now set password
+
+            // Success! App.tsx will detect session change + reset_mode and show ChangePasswordModal.
+            // We don't need to manually switch step here as this component will unmount.
+
         } catch (err: any) {
+            localStorage.removeItem('reset_mode'); // Clear flag on error
             setError(err.message || "Code invalide.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // 3. Set Password & Finish
-    const handleRegisterSetPassword = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-
-        if (newPassword.length < 6) {
-            setError("Min. 6 caractères.");
-            setLoading(false);
-            return;
-        }
-
-        try {
-            const { error } = await supabase.auth.updateUser({ password: newPassword });
-            if (error) throw error;
-            onLogin(); // Done
-        } catch (err: any) {
-            setError(err.message || "Erreur lors de la création.");
         } finally {
             setLoading(false);
         }
@@ -458,15 +453,7 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                         />
                     )}
 
-                    {step === 'REGISTER_PASSWORD' && (
-                        <PwdInput
-                            onSubmit={handleRegisterSetPassword}
-                            btnText="Créer mon compte"
-                            backStep="REGISTER_OTP"
-                            title="Créer un mot de passe"
-                            subTitle="Sécurisez votre nouveau compte"
-                        />
-                    )}
+
 
                     {/* --- RESET PASSWORD FLOW --- */}
                     {step === 'RESET_PHONE' && (
