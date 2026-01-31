@@ -229,11 +229,32 @@ const App: React.FC = () => {
 
         // 2. Load Cloud Data (Async & Merge)
         const cloudData = await dataSyncService.fetchUserData(session.user.id);
+
+        // Helper: Merge prioritizing LOCAL data (Preserve offline edits)
+        const mergeArrays = <T extends { id: string }>(local: T[], cloud: T[]): T[] => {
+          const map = new Map<string, T>();
+          cloud.forEach(item => map.set(item.id, item));
+          local.forEach(item => map.set(item.id, item));
+          return Array.from(map.values());
+        };
+
         if (cloudData) {
-          if (cloudData.products.length > 0) setProducts(cloudData.products);
-          if (cloudData.history.length > 0) setHistory(cloudData.history);
-          if (cloudData.credits.length > 0) setCredits(cloudData.credits);
-          if (cloudData.businessInfo) setBusinessInfo(cloudData.businessInfo);
+          if (cloudData.products.length > 0) {
+            setProducts(prev => mergeArrays(prev, cloudData.products));
+          }
+          if (cloudData.history.length > 0) {
+            setHistory(prev => mergeArrays(prev, cloudData.history));
+          }
+          if (cloudData.credits.length > 0) {
+            setCredits(prev => mergeArrays(prev, cloudData.credits));
+          }
+          // Business Info: Only overwrite if local is default/empty, otherwise keep local (user might be editing)
+          if (cloudData.businessInfo) {
+            setBusinessInfo(prev => {
+              if (prev.name === 'VOTRE ENTREPRISE' || !prev.name) return cloudData.businessInfo!;
+              return prev;
+            });
+          }
         }
       };
       loadData();

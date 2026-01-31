@@ -32,3 +32,5 @@ dist-ssr
 # Build Artifacts
 vite.config.ts.timestamp-*
 dist.zip
+
+.vercel
