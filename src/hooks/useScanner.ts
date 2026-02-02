@@ -103,7 +103,7 @@ export const useScanner = ({ products, onScanSuccess, onError }: UseScannerProps
                         let bestMatch: Product | null = null;
                         let bestScore = 0;
 
-                        products.forEach(p => {
+                        for (const p of products) {
                             const prodName = normalize(p.name);
                             // 1. Priority: Exact or Substring
                             if (prodName === scanName) {
@@ -124,7 +124,7 @@ export const useScanner = ({ products, onScanSuccess, onError }: UseScannerProps
                                     bestMatch = p;
                                 }
                             }
-                        });
+                        }
 
 
                         if (bestMatch && bestScore > 0.6) {
