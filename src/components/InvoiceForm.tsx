@@ -257,7 +257,7 @@ const InvoiceForm: React.FC<Props> = ({ data, products, customerBalance = 0, exi
                         <h2 className="font-black uppercase text-[10px] tracking-widest text-blue-900">Articles</h2>
                         <div className="flex gap-2">
                             <button type="button" onClick={() => setShowCatalog(true)} className="text-[10px] font-bold bg-blue-50 text-blue-700 px-3 py-2 rounded-lg flex items-center gap-1"><Package size={14} /> Catalogue</button>
-                            <button type="button" onClick={onScanClick} className="text-[10px] font-bold bg-orange-50 text-orange-700 px-3 py-2 rounded-lg flex items-center gap-1"><Camera size={14} /> Scan (Img/PDF)</button>
+                            <button type="button" onClick={onScanClick} className="text-[10px] font-bold bg-orange-50 text-orange-700 px-3 py-2 rounded-lg flex items-center gap-1"><Camera size={14} /> Scanner / Importer (Photo/PDF)</button>
                         </div>
                     </div>
                     <div className="space-y-4">

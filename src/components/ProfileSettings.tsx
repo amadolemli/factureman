@@ -2,7 +2,7 @@ import React, { useRef, useState, useMemo } from 'react';
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { BusinessInfo, InvoiceData, CreditRecord } from '../types';
-import { Settings, Image as ImageIcon, Palette, Store, MapPin, Phone, Briefcase, User, Search, MessageCircle, Contact2, Shield, Download, Upload, FileText, X, Info, Activity, Edit2, Save, UserPlus, Check } from 'lucide-react';
+import { Settings, Image as ImageIcon, Palette, Store, MapPin, Phone, Briefcase, User, Search, MessageCircle, Contact2, Shield, Download, Upload, FileText, X, Info, Activity, Edit2, Save, UserPlus, Check, Share2 } from 'lucide-react';
 import { testGeminiConnection } from '../services/geminiService';
 import { testMistralConnection } from '../services/mistralService';
 import AdminPanel from './AdminPanel';
@@ -204,7 +204,7 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
             <div className="flex justify-between items-center">
               <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Identité de l'entreprise</p>
               {creditsCount !== undefined && (
-                <span className={`text-[10px] px-2 py-1 rounded-full font-black border ${creditsCount > 50 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                <span className={`text-[10px] px-2 py-1 rounded-full font-black border ${creditsCount > 200 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                   Solde : {creditsCount} Crédits
                 </span>
               )}
@@ -390,6 +390,64 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
                 </div>
               </button>
             ))}
+          </div>
+        </div>
+      </div>
+
+
+      {/* SECTION PARRAINAGE */}
+      <div className="bg-gradient-to-br from-indigo-900 to-blue-900 p-4 rounded-2xl shadow-lg border border-indigo-700 text-white overflow-hidden relative animate-in slide-in-from-bottom-4 duration-700">
+        <div className="absolute top-0 right-0 p-8 opacity-10 transform rotate-12 pointer-events-none">
+          <UserPlus size={120} />
+        </div>
+
+        <div className="relative z-10 transition-transform hover:scale-[1.01] duration-300">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm shadow-inner">
+              <UserPlus size={24} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-white uppercase tracking-tight">Gagnez des Crédits</h2>
+              <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">Programme de parrainage</p>
+            </div>
+          </div>
+
+          <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10 mb-4 shadow-sm">
+            <p className="text-xs font-medium text-center text-indigo-100 leading-relaxed">
+              Invitez d'autres commerçants et recevez <span className="font-black text-yellow-400 text-sm">500 CRÉDITS</span> pour chaque inscription validée !
+            </p>
+          </div>
+
+          <div className="bg-white p-1 pl-4 rounded-xl flex items-center justify-between gap-2 shadow-xl ring-4 ring-white/10">
+            <div className="flex-grow py-2">
+              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Votre Code Unique</p>
+              {userProfile?.referral_code ? (
+                <p className="text-xl font-black text-blue-900 tracking-widest font-mono select-all">
+                  {userProfile.referral_code}
+                </p>
+              ) : (
+                <p className="text-xs font-bold text-gray-400 italic">Code non disponible</p>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                const code = userProfile?.referral_code;
+                if (!code) return;
+                const text = `Rejoins FactureMan avec mon code *${code}* et gère ton business simplement ! 🚀`;
+                if (navigator.share) {
+                  navigator.share({
+                    title: 'Rejoins FactureMan',
+                    text: text,
+                  }).catch(console.error);
+                } else {
+                  navigator.clipboard.writeText(text);
+                  alert("Code copié dans le presse-papier !");
+                }
+              }}
+              className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-lg flex-shrink-0"
+            >
+              <Share2 size={20} />
+            </button>
           </div>
         </div>
       </div>

@@ -45,7 +45,20 @@ export default async function handler(request: Request) {
             return new Response(JSON.stringify({ error: 'Rate Limit Exceeded: Please wait 10 seconds between scans.' }), { status: 429 });
         }
 
-        // 3. CONTINUE: Configuration Check
+        // 3. SECURITY: Payment (Deduct Credits)
+        const SCAN_COST = 40;
+        const { data: canAfford, error: paymentError } = await supabase.rpc('deduct_credits', { amount: SCAN_COST });
+
+        if (paymentError) {
+            console.error("Payment Error:", paymentError);
+            return new Response(JSON.stringify({ error: 'Payment Processing Failed' }), { status: 500 });
+        }
+
+        if (!canAfford) {
+            return new Response(JSON.stringify({ error: 'Insufficent Server Credits. Please recharge your account.' }), { status: 402 });
+        }
+
+        // 4. CONTINUE: Configuration Check
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
             return new Response(JSON.stringify({ error: 'Server Configuration Error: API Key missing' }), { status: 500 });
@@ -59,52 +72,71 @@ export default async function handler(request: Request) {
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // Unified Prompt (Same as frontend)
-        let prompt = `
-      RÔLE : Assistant OCR simple et précis.
-      TÂCHE : Transcrire le document (Facture, Devis, Liste) en JSON.
+        try {
+            // Unified Prompt (Strict Word-for-Word)
+            let prompt = `
+          RÔLE : Machine de transcription OCR stricte.
+          TÂCHE : Transcrire le document EXACTEMENT mot pour mot.
+          
+          RÈGLES CRITIQUES :
+          1. STRICTEMENT MOT POUR MOT : Transcris uniquement ce qui est visible. N'invente AUCUN mot. N'ajoute AUCUN article ou adjectif qui n'est pas sur l'image.
+          2. PAS D'INTERPRÉTATION : Si écrit "Pain", écris "Pain". N'écris pas "Pain de mie" si ce n'est pas écrit.
+          3. PAS DE CORRECTION : Ne corrige pas les fautes d'orthographe. Transcris ce que tu vois.
+          4. ECRIS 'INCONNU' si une valeur (prix/quantité) est illisible. NE DEVINE PAS.
+          5. FORMAT JSON VALIDE : Les nombres doivent être valides (Pas de "05", mais 5. Pas de "17.500", mais 17500).
 
-      RÈGLES DE LECTURE :
-      1. TEXTE VISIBLE : Lis exactement ce qui est écrit sur l'image.
-      2. CORRECTION FRANÇAISE : Si un mot est légèrement mal écrit ou flou, corrige-le UNIQUEMENT s'il correspond clairement à un mot existant en langue Française.
-      3. MOTS INCONNUS : Si le mot ne ressemble à aucun mot français connu, transcris-le EXACTEMENT comme tu le vois.
-      4. NE PAS INVENTER : N'ajoute pas de mots qui ne sont pas physiquement sur l'image.
+          ${context ? `CONTEXTE (Uniquement pour désambiguïser des lettres floues, PAS pour compléter) : L'utilisateur vend : ${context}.` : ""}
 
-      ${context ? `CONTEXTE (Optionnel) : L'utilisateur vend : ${context}. (Utilise ceci uniquement si ça aide à lire un mot illisible).` : ""}
+          SORTIE JSON ATTENDUE :
+          {
+            "customerName": "Nom tel qu'écrit (ou vide)",
+            "date": "Date telle qu'écrite (ou vide)",
+            "items": [
+              { "description": "TRANSCRIPTION EXACTE", "quantity": Nombre, "unitPrice": Nombre }
+            ]
+          }
+        `;
+            console.log("Sending to Gemini...");
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Use the fast/cheap model
 
-      SORTIE JSON ATTENDUE :
-      {
-        "customerName": "Nom (ou vide)",
-        "date": "YYYY-MM-DD (ou date d'aujourd'hui)",
-        "items": [
-          { "description": "Texte lu", "quantity": Nombre, "unitPrice": Nombre }
-        ]
-      }
-    `;
-
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Use the fast/cheap model
-
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    data: base64Data,
-                    mimeType: mimeType || "image/jpeg",
+            const result = await model.generateContent([
+                prompt,
+                {
+                    inlineData: {
+                        data: base64Data,
+                        mimeType: mimeType || "image/jpeg",
+                    },
                 },
-            },
-        ]);
+            ]);
 
-        const response = await result.response;
-        const text = response.text();
+            const response = await result.response;
+            const text = response.text();
 
-        // Cleanup JSON
-        const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-        const data = JSON.parse(cleanedText);
+            // Cleanup JSON
+            const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+            const data = JSON.parse(cleanedText); // This might throw if AI fails
 
-        return new Response(JSON.stringify(data), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-        });
+            return new Response(JSON.stringify(data), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+        } catch (aiError: any) {
+            console.error("AI/Parsing Error - Refunding Credits:", aiError);
+
+            // REFUND LOGIC
+            // We pass negative amount to 'deduct' to add back credits.
+            const { error: refundError } = await supabase.rpc('deduct_credits', { amount: -SCAN_COST });
+
+            if (refundError) {
+                console.error("CRITICAL: Refund Failed:", refundError);
+            } else {
+                console.log("Refund Successful.");
+            }
+
+            // Continue to return error to client
+            throw aiError;
+        }
 
     } catch (error: any) {
         console.error("API Scan Error:", error);

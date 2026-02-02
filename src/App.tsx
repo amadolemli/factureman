@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { InvoiceData, AppStep, DocumentType, Product, BusinessInfo, CreditRecord, Reminder, UserProfile } from './types';
+import { InvoiceData, AppStep, DocumentType, Product, BusinessInfo, CreditRecord, Reminder, UserProfile, CreditHistoryItem } from './types';
 import { DEFAULT_BUSINESS, PRODUCT_CATALOG } from './constants';
 import { generateInvoiceNumber, formatCurrency } from './utils/format';
 import InvoiceForm from './components/InvoiceForm';
@@ -26,14 +25,26 @@ import { dataSyncService } from './services/dataSyncService';
 import { Session } from '@supabase/supabase-js';
 import { LogOut } from 'lucide-react';
 import { useWallet } from './hooks/useWallet';
+import { useScanner } from './hooks/useScanner';
+import { useOfflineActivity } from './hooks/useOfflineActivity';
 import OnboardingTour from './components/OnboardingTour';
 import ChangePasswordModal from './components/ChangePasswordModal';
+import NotificationCenter, { AppNotification } from './components/NotificationCenter';
 
 const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.FORM);
   const [previousStep, setPreviousStep] = useState<AppStep>(AppStep.FORM);
+
+  const goToStep = (newStep: AppStep) => {
+    if (newStep === AppStep.PREVIEW) {
+      setPreviousStep(step);
+    }
+    setStep(newStep);
+    window.scrollTo(0, 0);
+  };
+
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
+
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showConvertMenu, setShowConvertMenu] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -43,6 +54,67 @@ const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+
+  // NOTIFICATION & SYNC STATE
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error' | 'success' | 'offline'>('idle');
+
+  // --- CHECKERS ---
+  const addNotification = (notif: Omit<AppNotification, 'id' | 'date' | 'read'>) => {
+    setNotifications(prev => {
+      // Avoid duplicate titles (simple dedup)
+      if (prev.some(n => n.title === notif.title && n.read === false)) return prev;
+      return [{
+        ...notif,
+        id: Math.random().toString(36).substr(2, 9),
+        date: new Date(),
+        read: false
+      }, ...prev];
+    });
+  };
+
+  const checkAlerts = (currentProducts: Product[], currentCredits: number) => {
+    // 1. Stock Alert
+    const lowStock = currentProducts.filter(p => p.stock > 0 && p.stock <= 5);
+    if (lowStock.length > 0) {
+      addNotification({
+        type: 'warning',
+        title: 'Stock Faible',
+        message: `${lowStock.length} produit(s) sont presque épuisés (stock <= 5). Vérifiez votre inventaire.`
+      });
+    }
+
+    // 2. Credits Alert
+    if (currentCredits < 200 && currentCredits > 0) {
+      addNotification({
+        type: 'alert',
+        title: 'Crédits Bas',
+        message: `Il ne vous reste que ${currentCredits} crédits. Les scans et sauvegardes cloud risquent d'échouer.`
+      });
+    }
+  };
+
+  useEffect(() => {
+    const handleOnline = () => setSyncStatus('idle');
+    const handleOffline = () => {
+      setSyncStatus('offline');
+      addNotification({
+        type: 'warning',
+        title: 'Mode Hors-Ligne',
+        message: 'Vous êtes déconnecté. Vos données sont sauvegardées localement et seront synchronisées au retour de la connexion.'
+      });
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial check
+    if (!navigator.onLine) handleOffline();
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     // 1. Check active session
@@ -107,6 +179,11 @@ const App: React.FC = () => {
             setUserProfile(newProfile);
             localStorage.setItem(`factureman_${session.user.id}_profile`, JSON.stringify(newProfile));
             setShowSuccessToast(true);
+            addNotification({
+              type: 'success',
+              title: 'Crédits Reçus',
+              message: `Votre solde a été mis à jour : ${newProfile.app_credits} crédits disponibles.`
+            });
           }
         )
         .subscribe();
@@ -148,13 +225,13 @@ const App: React.FC = () => {
   };
 
   // --- NAVIGATION LOGIC ---
-  const goToStep = (newStep: AppStep, saveHistory = true) => {
-    setPreviousStep(step);
-    setStep(newStep);
-    if (saveHistory) {
-      window.history.pushState({ step: newStep }, '');
-    }
-  };
+  // const goToStep = (newStep: AppStep, saveHistory = true) => {
+  //   setPreviousStep(step);
+  //   setStep(newStep);
+  //   if (saveHistory) {
+  //     window.history.pushState({ step: newStep }, '');
+  //   }
+  // };
 
   useEffect(() => {
     // Basic history management
@@ -184,6 +261,8 @@ const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [history, setHistory] = useState<InvoiceData[]>([]);
   const [credits, setCredits] = useState<CreditRecord[]>([]);
+
+  /* REMOVED FROM HERE, SEE BELOW */
 
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo>({
     name: 'VOTRE ENTREPRISE',
@@ -306,6 +385,34 @@ const App: React.FC = () => {
       return prev;
     });
   }, [templatePreference, session]);
+
+  // AUTO SYNC & ALERTS CHECK LOOP
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!session?.user?.id || !navigator.onLine) return;
+
+      setSyncStatus('syncing');
+      const result = await dataSyncService.syncAll(session.user.id, {
+        products,
+        invoices: history,
+        credits,
+        businessInfo
+      });
+
+      if (result.success) {
+        setSyncStatus('success');
+        setTimeout(() => setSyncStatus('idle'), 3000);
+      } else {
+        setSyncStatus('error');
+      }
+
+      // Check alerts every cycle
+      checkAlerts(products, walletCredits);
+
+    }, 2 * 60 * 1000); // Every 2 minutes
+
+    return () => clearInterval(interval);
+  }, [session, products, history, credits, businessInfo, walletCredits]);
 
 
   const [invoiceData, setInvoiceData] = useState<InvoiceData>(() => ({
@@ -437,7 +544,8 @@ const App: React.FC = () => {
       date: new Date().toISOString().split('T')[0], // Date d'aujourd'hui pour la conversion
       isFinalized: false,
       creditConfirmed: newType === DocumentType.RECEIPT ? true : false,
-      amountPaid: 0
+      amountPaid: 0,
+      createdAt: new Date().toISOString()
     };
 
     setInvoiceData(newDoc);
@@ -448,139 +556,110 @@ const App: React.FC = () => {
     setTimeout(() => setShowSuccessToast(false), 2000);
   };
 
-  const handleScan = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // 1. Check Credits First
-    const REQUIRED_CREDITS = 10;
-    if (walletCredits < REQUIRED_CREDITS) {
-      if ((userProfile?.app_credits || 0) > 0) {
-        alert("Solde hors ligne insuffisant pour scanner.\nConnectez-vous pour télécharger vos crédits.");
-      } else {
-        alert("Solde insuffisant pour utiliser le scanner !");
-      }
-      return;
-    }
+  // --- OFFLINE ACTIVITY LIMITS & DEFERRED BILLING ---
+  const { canPerformAction, incrementOfflineCount, offlineCount, maxOfflineDocs, hasUnpaidDebt, attemptToPayDebt } = useOfflineActivity();
 
+  // If debt exists blocking the user, we can auto-prompt or just rely on the button clicks
+  useEffect(() => {
+    if (hasUnpaidDebt && navigator.onLine) {
+      // Optionally prompt user: "Sync successful payment required"
+    }
+  }, [hasUnpaidDebt]);
+
+  // --- SCANNER LOGIC (Refactored to Hook) ---
+  const { isScanning, scanFile } = useScanner({
+    products,
+    onScanSuccess: (newItems, customerName, date) => {
+      setInvoiceData(prev => ({
+        ...prev,
+        customerName: customerName || prev.customerName,
+        date: date || prev.date,
+        items: newItems.length > 0 ? newItems : prev.items,
+        creditConfirmed: false
+      }));
+
+      if (newItems.length > 0) {
+        const matchCount = newItems.filter((i: any) => products.some(p => p.name === i.description)).length;
+        if (matchCount > 0) alert(`${matchCount} article(s) reconnu(s) dans le catalogue !`);
+      }
+
+      // DEDUCT PROCESING FEE (Local Wallet)
+      // Note: The heavy scan cost (40) is now paid Server-Side. 
+      // We only deduct a small processing fee (10) from the local wallet for app usage.
+      const PROCESSING_FEE = 10;
+      setWalletCredits(prev => prev - PROCESSING_FEE);
+
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 2000);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    },
+    onError: (msg) => {
+      alert(msg);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  });
+
+  const handleScan = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    setIsScanning(true);
 
-    // CHARGE 40 CREDITS FOR AI SCAN (FROM WALLET)
-    const SCAN_COST = 40;
-
-    // Check Wallet Balance
-    if (walletCredits < SCAN_COST) {
-      alert(`Portefeuille insuffisant (${walletCredits} crédits) !\n\nLe scan coûte ${SCAN_COST} crédits.\nSi vous avez des crédits en banque, attendez quelques secondes la recharge automatique.`);
-      setIsScanning(false);
+    // Check Local Wallet for Processing Fee
+    if (walletCredits < 10) {
+      alert("Solde Portefeuille insuffisant (> 10) pour traiter le résultat.\nVeuillez recharger ou synchroniser.");
       return;
     }
 
-    // Deduct Locally
-    setWalletCredits(prev => prev - SCAN_COST);
-
-    /* 
-    DEPRECATED: Direct Server Deduction
-    const { data: success, error } = await supabase.rpc('deduct_credits', { amount: SCAN_COST });
-    */
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const base64 = (event.target?.result as string).split(',')[1];
-        const mimeType = file.type; // "image/jpeg", "image/png", or "application/pdf"
-
-        // Generate Context from Catalog
-        // We take the top 100 products to avoid overflowing tokens (though Gemini 2.0 has 1M context, others might not)
-        const productNames = products.map(p => p.name).slice(0, 100).join(", ");
-        const scanContext = `Known Items: ${productNames}. Domain: General Business (Hardware/Retail/Services).`;
-
-        // Pass mimeType and context to service
-        const result = await extractItemsFromImage(base64, mimeType, scanContext);
-        if (result) {
-          const newItems = result.items?.map((item: any) => {
-            // Tentative de correspondance avec le catalogue
-            let finalDesc = item.description || '';
-            // PAR DÉFAUT : 0 si pas de match (le client veut le prix vide si pas connu)
-            let finalPrice = 0;
-
-            if (finalDesc) {
-              const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-              const scanName = normalize(finalDesc);
-
-              // Trouve le produit le plus proche
-              const match = products.find(p => {
-                const prodName = normalize(p.name);
-                return prodName.includes(scanName) || scanName.includes(prodName);
-              });
-
-              if (match) {
-                finalDesc = match.name; // Utilise le nom officiel du catalogue
-                finalPrice = match.defaultPrice; // Utilise le PRIX DU CATALOGUE
-              }
-            }
-
-            return {
-              id: Math.random().toString(36).substr(2, 9),
-              quantity: item.quantity || 1,
-              description: finalDesc,
-              unitPrice: finalPrice // Sera 0 si pas dans le catalogue, ou le prix catalogue si trouvé
-            };
-          }) || [];
-
-          setInvoiceData(prev => ({
-            ...prev,
-            customerName: result.customerName || prev.customerName,
-            date: result.date || prev.date,
-            items: newItems.length > 0 ? newItems : prev.items,
-            creditConfirmed: false
-          }));
-
-          if (newItems.length > 0) {
-            const matchCount = newItems.filter((i: any) => products.some(p => p.name === i.description)).length;
-            if (matchCount > 0) {
-              alert(`${matchCount} article(s) reconnu(s) dans le catalogue !`);
-            }
-          }
-
-          // DEDUCT CREDITS FOR SCAN
-          setWalletCredits(prev => prev - REQUIRED_CREDITS);
-
-          setShowSuccessToast(true);
-          setTimeout(() => setShowSuccessToast(false), 2000);
-        } else {
-          alert("Le scan n'a rien renvoyé. Veuillez réessayer.");
-        }
-      } catch (error) { console.error(error); alert("Erreur lors de l'analyse : " + error); } finally {
-        setIsScanning(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    };
-    reader.readAsDataURL(file);
+    // Note: Server-side credit check happens inside scanFile -> API
+    scanFile(file);
   };
 
+  // --- FINALIZE DOCUMENT ---
   const finalizeDocument = async (overrideDoc?: InvoiceData) => {
     // Determine which data to use
     const docToProcess = overrideDoc || invoiceData;
+    if (!docToProcess) return;
 
-    // 1. Check Credits (10 Credits per Document)
-    const REQUIRED_CREDITS = 10;
-
-    // Check WALLET (Local Cash)
-    if (walletCredits < REQUIRED_CREDITS) {
-      if ((userProfile?.app_credits || 0) > 0) {
-        alert("Solde hors ligne épuisé.\n\nConnectez-vous pour télécharger vos crédits restants de la Banque (Serveur) vers votre appareil.");
-      } else {
-        alert("Solde insuffisant (0 Crédits) !\n\nVeuillez recharger votre compte.");
+    // 0. CHECK DEBT LOCK
+    if (hasUnpaidDebt) {
+      if (confirm("Action Bloquée : Paiement en attente pour les documents hors-ligne.\nVoulez-vous régler maintenant ?")) {
+        attemptToPayDebt();
       }
       return;
     }
 
-    // 2. Prepare Data
+    const DOC_COST = 10;
+
+    // A. ONLINE: Deduct
+    if (navigator.onLine) {
+      if ((userProfile?.app_credits || 0) < DOC_COST) {
+        alert("Solde insuffisant (10 Crédits requis).\nVeuillez recharger votre compte.");
+        return;
+      }
+      const { data: success, error } = await supabase.rpc('deduct_credits', { amount: DOC_COST });
+      if (error || !success) {
+        alert("Erreur de paiement. Vérifiez votre solde.");
+        return;
+      }
+      // Optimistic
+      setUserProfile(prev => prev ? ({ ...prev, app_credits: prev.app_credits - DOC_COST }) : null);
+    }
+    // B. OFFLINE: Limit & Track
+    else {
+      // 1. Check Offline Limits (Instead of Credits)
+      if (!canPerformAction()) {
+        alert(`Limite hors ligne atteinte (${offlineCount}/${maxOfflineDocs}).\n\nVeuillez vous connecter à internet pour sauvegarder votre travail et réinitialiser le compteur.`);
+        return;
+      }
+      incrementOfflineCount();
+    }
+
     const finalName = docToProcess.customerName.trim().toUpperCase() || "CLIENT COMPTANT";
     const finalDoc = {
       ...docToProcess,
       customerName: finalName,
       isFinalized: true,
-      creditConfirmed: true
+      creditConfirmed: true,
+      createdAt: new Date().toISOString()
     };
 
     const currentTotalVal = finalDoc.items.reduce((acc, i) => acc + (i.unitPrice * i.quantity), 0);
@@ -592,7 +671,7 @@ const App: React.FC = () => {
         const existingIdx = prevCredits.findIndex(c => c.customerName.toUpperCase() === normalizedName);
 
         let amountToAddToBalance = 0;
-        let moves: any[] = [];
+        let moves: CreditHistoryItem[] = [];
 
         if (finalDoc.type === DocumentType.RECEIPT) {
           amountToAddToBalance = -paymentAmount;
@@ -602,6 +681,7 @@ const App: React.FC = () => {
             type: 'INVOICE' as const,
             id: finalDoc.id,
             date: finalDoc.date,
+            createdAt: finalDoc.createdAt,
             amount: currentTotalVal,
             description: `${finalDoc.type} N°${finalDoc.number}`
           });
@@ -612,6 +692,7 @@ const App: React.FC = () => {
             type: 'PAYMENT' as const,
             id: `pay-${finalDoc.id}`,
             date: finalDoc.date,
+            createdAt: finalDoc.createdAt,
             amount: paymentAmount,
             description: finalDoc.type === DocumentType.RECEIPT ? `Versement (Reçu N°${finalDoc.number})` : `Versement sur ${finalDoc.number}`
           });
@@ -642,8 +723,8 @@ const App: React.FC = () => {
       });
     }
 
-    // 3. Consume WALLET Credits (Offline Safe)
-    setWalletCredits(prev => prev - REQUIRED_CREDITS);
+    // 3. Track Activity (Already handled in the top block)
+    // incrementOfflineCount(); // REMOVED here, moved to top conditional block
 
     // 4. Update Stock
     if (finalDoc.type !== DocumentType.RECEIPT && finalDoc.type !== DocumentType.PROFORMA && finalDoc.type !== DocumentType.QUOTE) {
@@ -694,7 +775,8 @@ const App: React.FC = () => {
           templateId: templatePreference,
           amountPaid: paymentAmount,
           isFinalized: true,
-          clientBalanceSnapshot: finalSnapshotBalance
+          clientBalanceSnapshot: finalSnapshotBalance,
+          createdAt: new Date().toISOString()
         };
         newHistory = [receiptDoc, ...newHistory];
       }
@@ -729,72 +811,65 @@ const App: React.FC = () => {
     finalizeDocument(savedData);
   };
 
-  const handleAddPayment = (customerName: string, amount: number) => {
-    const normalizedName = customerName.toUpperCase();
-    setCredits(prev => {
-      const existingIdx = prev.findIndex(c => c.customerName.toUpperCase() === normalizedName);
-      if (existingIdx !== -1) {
-        const updated = [...prev];
-        const c = updated[existingIdx];
-        updated[existingIdx] = {
-          ...c,
-          remainingBalance: c.remainingBalance - amount,
-          history: [{
-            type: 'PAYMENT' as const,
-            id: Math.random().toString(36).substr(2, 9),
-            date: new Date().toISOString(),
-            amount: amount,
-            description: c.remainingBalance > 0 ? 'Versement reçu' : 'Chargement Portefeuille'
-          }, ...c.history]
-        };
-        return updated;
-      } else {
-        // Cas rare où on ajoute un paiement sans client existant (création auto)
-        return [{
-          id: Math.random().toString(36).substr(2, 9),
-          customerName: customerName,
-          totalDebt: 0,
-          remainingBalance: -amount,
-          history: [{
-            type: 'PAYMENT' as const,
-            id: Math.random().toString(36).substr(2, 9),
-            date: new Date().toISOString(),
-            amount: amount,
-            description: 'Ouverture Portefeuille'
-          }]
-        }, ...prev];
+  // Helper to process the cost of a document (Online/Offline)
+  const processDocumentCost = async (): Promise<boolean> => {
+    // 0. CHECK DEBT LOCK
+    if (hasUnpaidDebt) {
+      if (confirm("Action Bloquée : Paiement en attente pour les documents hors-ligne.\nVoulez-vous régler maintenant ?")) {
+        attemptToPayDebt();
       }
-    });
-    // On peut générer un reçu automatiquement si on le souhaite, mais ici c'est CreditManager qui déclenche.
-  };
-
-  const handleGenerateReceipt = (customerName: string, amount: number, date: string, transactionId?: string) => {
-    // 1. Chercher si le reçu existe déjà dans l'historique
-    const existingReceipt = history.find(h => h.id === transactionId);
-
-    if (existingReceipt) {
-      setInvoiceData(existingReceipt);
-      goToStep(AppStep.PREVIEW);
-      return;
+      return false;
     }
 
-    // 2. Sinon, créer un nouveau reçu
-    // Retrieve current balance for snapshot
-    const creditRecord = credits.find(c => c.customerName.toUpperCase() === customerName.toUpperCase());
+    const DOC_COST = 10;
+
+    // A. ONLINE
+    if (navigator.onLine) {
+      if ((userProfile?.app_credits || 0) < DOC_COST) {
+        alert("Solde Crédit Insuffisant.\n\nVous avez besoin de 10 crédits pour générer ce document.\nVeuillez recharger votre compte pour continuer.");
+        return false;
+      }
+      const { data: success, error } = await supabase.rpc('deduct_credits', { amount: DOC_COST });
+      if (error || !success) {
+        alert("Erreur de paiement. Veuillez vérifier votre connexion et votre solde.");
+        return false;
+      } setUserProfile(prev => prev ? ({ ...prev, app_credits: prev.app_credits - DOC_COST }) : null);
+      return true;
+    }
+    // B. OFFLINE
+    else {
+      if (!canPerformAction()) {
+        alert(`Limite hors ligne atteinte (${offlineCount}/${maxOfflineDocs}).\n\nVeuillez vous connecter.`);
+        return false;
+      }
+      incrementOfflineCount();
+      return true;
+    }
+  };
+
+  const handleAddPayment = async (customerName: string, amount: number) => {
+    // 1. PAYMENT / LIMIT CHECK
+    const authorized = await processDocumentCost();
+    if (!authorized) return;
+
+    const normalizedName = customerName.toUpperCase();
+    const date = new Date().toISOString();
+    const transactionId = Math.random().toString(36).substr(2, 9);
+
+    // 2. CREATE RECEIPT DOCUMENT (Background)
+    const creditRecord = credits.find(c => c.customerName.toUpperCase() === normalizedName);
     const currentSnapshot = creditRecord ? creditRecord.remainingBalance : 0;
 
-    // Determine description style
-    // If it's a simple payment via credit manager, usually it's "Versement"
-    // We can try to see if it was an overpayment (Credit < 0)
+    // Description logic
     let desc = 'Versement sur compte client';
     if (creditRecord && creditRecord.remainingBalance < 0) {
       desc = `Versement (Solde: ${formatCurrency(Math.abs(creditRecord.remainingBalance))} F Créditeur)`;
     }
 
     const receiptDoc: InvoiceData = {
-      id: transactionId || Math.random().toString(36).substr(2, 9),
+      id: transactionId,
       type: DocumentType.RECEIPT,
-      number: `R-${generateInvoiceNumber().split('-')[1]}`, // R-RAND
+      number: `R-${generateInvoiceNumber().split('-')[1]}`,
       date: date,
       customerName: customerName,
       items: [{ id: 'r1', quantity: 1, description: desc, unitPrice: amount }],
@@ -802,12 +877,68 @@ const App: React.FC = () => {
       templateId: templatePreference,
       amountPaid: amount,
       isFinalized: true,
-      clientBalanceSnapshot: currentSnapshot
+      createdAt: date,
+      clientBalanceSnapshot: currentSnapshot - amount // Snapshot AFTER payment
     };
 
     setHistory(prev => [receiptDoc, ...prev]);
-    setInvoiceData(receiptDoc);
-    goToStep(AppStep.PREVIEW);
+
+    // 3. UPDATE LEDGER
+    setCredits(prev => {
+      const existingIdx = prev.findIndex(c => c.customerName.toUpperCase() === normalizedName);
+
+      const moves: CreditHistoryItem[] = [{
+        type: 'PAYMENT' as const,
+        id: transactionId,
+        date: date,
+        createdAt: date,
+        amount: amount,
+        description: desc
+      }];
+
+      if (existingIdx !== -1) {
+        const existing = prev[existingIdx];
+        const updatedList = [...prev];
+        updatedList[existingIdx] = {
+          ...existing,
+          remainingBalance: existing.remainingBalance - amount,
+          history: [...moves, ...existing.history]
+        };
+        return updatedList;
+      } else {
+        // Safe fallback for new client (rare in this specific path)
+        return [{
+          id: Math.random().toString(36).substr(2, 9),
+          customerName: normalizedName,
+          customerPhone: '',
+          totalDebt: 0,
+          remainingBalance: -amount, // Negative = Credit
+          history: moves
+        }, ...prev];
+      }
+    });
+
+    // 4. FEEDBACK
+    setShowSuccessToast(true);
+    setTimeout(() => setShowSuccessToast(false), 2000);
+  };
+
+  // Modified to just VIEW the receipt (since it's now created at payment time)
+  // But strictly speaking, if called with ID, we find it. If not found (legacy?), we creates it? 
+  // Let's keep it simple: It tries to find it.
+  const handleGenerateReceipt = async (customerName: string, amount: number, date: string, transactionId?: string) => {
+    // Try to find by Transaction ID first (best link) or fallback logic
+    const existing = history.find(h => h.id === transactionId);
+
+    if (existing) {
+      setInvoiceData(existing);
+      goToStep(AppStep.PREVIEW);
+    } else {
+      // Fallback: If for some reason it wasn't created (e.g. legacy data), create it now using the OLD logic?
+      // Or just alert? 
+      // Let's assume for new flow, it exists.
+      alert("Reçu introuvable ou ancien format.");
+    }
   };
 
 
@@ -1168,18 +1299,7 @@ const App: React.FC = () => {
           {/* LEFT SECTION: NAVIGATION */}
           <div className="flex items-center gap-3">
             {step === AppStep.PREVIEW ? (
-              <button
-                onClick={() => {
-                  if (invoiceData.isFinalized) {
-                    resetInvoice();
-                  } else {
-                    setStep(previousStep);
-                  }
-                }}
-                className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-xl font-black uppercase text-[10px] flex items-center gap-2 shadow-lg active:scale-95 transition-all"
-              >
-                <X size={18} strokeWidth={3} /> Fermer
-              </button>
+              <button onClick={() => goToStep(previousStep)} className="bg-red-50 text-red-500 p-2 rounded-xl active:scale-90 font-bold flex items-center gap-2 text-xs border border-red-100"><ArrowLeft size={18} /> Fermer</button>
             ) : (
               <div className="flex items-center gap-3">
                 {step !== AppStep.FORM && (
@@ -1197,7 +1317,7 @@ const App: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <p className="text-[9px] text-blue-300 font-bold uppercase mt-1 tracking-wider">{getHeaderTitle()}</p>
                     {userProfile && (
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${(userProfile.app_credits + walletCredits) > 50 ? 'bg-blue-800 text-blue-200 border-blue-700' : 'bg-red-900 text-red-200 border-red-700 animate-pulse'}`}>
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${(userProfile.app_credits + walletCredits) > 200 ? 'bg-blue-800 text-blue-200 border-blue-700' : 'bg-red-900 text-red-200 border-red-700 animate-pulse'}`}>
                         {(userProfile.app_credits + walletCredits)} CRÉDITS
                       </span>
                     )}
@@ -1208,7 +1328,23 @@ const App: React.FC = () => {
           </div>
 
           {/* RIGHT SECTION: ACTIONS */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* SYNC STATUS */}
+            <div className={`h-2 w-2 rounded-full transition-all duration-500 ${syncStatus === 'syncing' ? 'bg-blue-400 animate-ping' :
+              syncStatus === 'error' ? 'bg-red-500' :
+                syncStatus === 'offline' ? 'bg-gray-500' :
+                  'bg-green-400'
+              }`} title={`Status: ${syncStatus}`} />
+
+            {/* NOTIFICATIONS */}
+            <NotificationCenter
+              notifications={notifications}
+              onMarkAsRead={(id) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))}
+              onClearAll={() => setNotifications([])}
+            />
+
+            <div className="h-6 w-px bg-blue-800 mx-1"></div>
+
             {step === AppStep.PREVIEW ? (
               <div className="flex gap-2">
                 <button onClick={() => setShowConvertMenu(!showConvertMenu)} className={`p-2 rounded-xl transition-all ${showConvertMenu ? 'bg-blue-400 text-white' : 'bg-blue-600/50 text-white active:scale-90'}`} title="Transformer">
@@ -1442,6 +1578,16 @@ const App: React.FC = () => {
       {showPasswordResetModal && (
         <ChangePasswordModal onClose={() => setShowPasswordResetModal(false)} />
       )}
+
+      {/* HIDDEN FILE INPUT FOR SCANNER */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        hidden
+        className="hidden"
+        accept="image/*,application/pdf"
+        onChange={handleScan}
+      />
 
       {/* BOTTOM NAV (Masqué en mode Preview pour focus) */}
       {step !== AppStep.PREVIEW && (

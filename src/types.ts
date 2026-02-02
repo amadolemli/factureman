@@ -3,6 +3,7 @@ export interface UserProfile {
   id: string;
   business_name?: string;
   app_credits: number;
+  referral_code?: string;
   is_admin: boolean;
   is_super_admin?: boolean;
   is_banned?: boolean;
@@ -50,20 +51,23 @@ export interface CreditRecord {
   customerPhone?: string;
   totalDebt: number;
   remainingBalance: number;
-  history: {
-    type: 'INVOICE' | 'PAYMENT';
-    id: string;
-    date: string;
-    amount: number;
-    description: string;
-    status?: 'CANCELLED';
-  }[];
+  history: CreditHistoryItem[];
   appointments?: {
     id: string;
     date: string; // ISO string
     note: string;
     completed: boolean;
   }[];
+}
+
+export interface CreditHistoryItem {
+  type: 'INVOICE' | 'PAYMENT';
+  id: string;
+  date: string;
+  createdAt?: string;
+  amount: number;
+  description: string;
+  status?: 'CANCELLED';
 }
 
 export interface Reminder {
@@ -89,6 +93,7 @@ export interface InvoiceData {
   isFinalized?: boolean;
   creditConfirmed?: boolean;
   clientBalanceSnapshot?: number;
+  createdAt?: string; // ISO String timestamp of creation
 }
 
 export enum AppStep {

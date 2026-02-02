@@ -129,5 +129,34 @@ export const dataSyncService = {
             business_info: info
         });
         if (error) console.error('Error saving profile:', error);
+    },
+
+    // --- AUTO SYNC ---
+    async syncAll(userId: string, data: {
+        products: Product[],
+        invoices: InvoiceData[],
+        credits: CreditRecord[],
+        businessInfo: BusinessInfo
+    }) {
+        if (!navigator.onLine) {
+            return { success: false, reason: 'offline' };
+        }
+
+        if (!userId) return { success: false, reason: 'no-user' };
+
+        try {
+            console.log("Starting Auto-Sync...");
+            await Promise.all([
+                this.saveProducts(data.products, userId),
+                this.saveInvoices(data.invoices, userId),
+                this.saveCreditRecords(data.credits, userId),
+                this.saveBusinessInfo(data.businessInfo, userId)
+            ]);
+            console.log("Auto-Sync Completed.");
+            return { success: true, timestamp: Date.now() };
+        } catch (error) {
+            console.error("Auto-Sync Failed:", error);
+            return { success: false, reason: 'error' };
+        }
     }
 };

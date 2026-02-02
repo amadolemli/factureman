@@ -13,6 +13,7 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
     const [password, setPassword] = useState('');
     const [otp, setOtp] = useState('');
     const [newPassword, setNewPassword] = useState('');
+    const [referralCode, setReferralCode] = useState('');
 
     // UI State
     const [loading, setLoading] = useState(false);
@@ -108,6 +109,11 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
             const finalPhone = getFormattedPhone();
             const { error } = await supabase.auth.signInWithOtp({
                 phone: finalPhone,
+                options: {
+                    data: {
+                        referral_code: referralCode
+                    }
+                }
             });
 
             if (error) throw error;
@@ -198,7 +204,7 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
 
     // --- RENDER HELPERS ---
 
-    const PhoneInput = ({ onSubmit, btnText, backStep }: any) => (
+    const PhoneInput = ({ onSubmit, btnText, backStep, showReferral = false }: any) => (
         <form onSubmit={onSubmit} className="space-y-4 animate-in slide-in-from-right">
             <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-gray-400 pl-2">Pays & Numéro de Téléphone</label>
@@ -249,6 +255,21 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                     </div>
                 </div>
             </div>
+            {showReferral && (
+                <div className="space-y-1 animate-in fade-in slide-in-from-bottom-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 pl-2">Code Parrainage (Optionnel)</label>
+                    <div className="relative">
+                        <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                        <input
+                            type="text"
+                            className="w-full pl-10 pr-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors uppercase placeholder:normal-case"
+                            placeholder="Entrez le code ici"
+                            value={referralCode}
+                            onChange={(e: any) => setReferralCode(e.target.value.toUpperCase())}
+                        />
+                    </div>
+                </div>
+            )}
             <button
                 type="submit"
                 disabled={loading}
@@ -442,6 +463,7 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                             onSubmit={handleRegisterPhoneSubmit}
                             btnText="Envoyer Code de Vérification"
                             backStep="HOME"
+                            showReferral={true}
                         />
                     )}
 

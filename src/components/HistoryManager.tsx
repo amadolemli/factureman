@@ -46,7 +46,11 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
 
       return matchesSearch && matchesType;
     })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    .sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.date).getTime();
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.date).getTime();
+      return timeB - timeA;
+    });
 
   const getBadgeColors = (type: DocumentType) => {
     switch (type) {
@@ -121,7 +125,7 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
             const isReceipt = item.type === DocumentType.RECEIPT;
 
             return (
-              <div key={item.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden group hover:border-blue-300 transition-all ${isUnpaid ? 'border-orange-200' : 'border-gray-100'}`}>
+              <div key={item.id} className={`bg-white rounded-2xl border shadow-sm group hover:border-blue-300 transition-all ${isUnpaid ? 'border-orange-200' : 'border-gray-100'}`}>
                 <div className="p-4 flex items-center justify-between relative">
                   <div className="flex items-center gap-4">
                     <div className={`p-3 rounded-xl border ${getBadgeColors(item.type)}`}>
@@ -148,7 +152,13 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
                       </h3>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="flex items-center gap-1 text-[9px] text-gray-400 font-bold uppercase tracking-tighter">
-                          <Calendar size={10} /> {new Date(item.date).toLocaleDateString('fr-FR')}
+                          <Calendar size={10} />
+                          {new Date(item.date).toLocaleDateString('fr-FR')}
+                          {item.createdAt && (
+                            <span className="text-gray-300 ml-1">
+                              {new Date(item.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
                         </span>
                         <span className={`font-black text-xs ${isReceipt ? 'text-green-600' : 'text-blue-900'}`}>
                           {formatCurrency(total)} F

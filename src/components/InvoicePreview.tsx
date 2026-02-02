@@ -76,7 +76,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
 
         <div className="flex flex-col md:flex-row justify-between items-start mb-6 text-sm font-bold gap-4">
           <div className="w-full md:w-auto">
-            <span>Fait le {maskDate(data.date)}</span>
+            <span>Fait le {maskDate(data.date)} {data.createdAt && !isDraft && <span className="text-gray-500 font-normal">à {new Date(data.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}</span>
             <div className="mt-2 space-y-1">
               <div>
                 {isReceipt ? "REÇU DE :" : "DOIT :"}
@@ -247,7 +247,9 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">N° {maskText(data.number)}</p>
-                  <p className="text-xs font-medium text-slate-400">{maskDate(data.date)}</p>
+                  <p className="text-xs font-medium text-slate-400">
+                    {maskDate(data.date)} {data.createdAt && !isDraft && <span>- {new Date(data.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}
+                  </p>
                 </div>
               </div>
             </div>
@@ -384,7 +386,9 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
               </div>
               <div className="text-slate-300 space-y-1 mt-2">
                 <p className="text-sm font-light">N° <span className="font-bold text-white">{maskText(data.number)}</span></p>
-                <p className="text-xs font-light opacity-80">{maskDate(data.date)}</p>
+                <p className="text-xs font-light opacity-80">
+                  {maskDate(data.date)} {data.createdAt && !isDraft && <span>• {new Date(data.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}
+                </p>
               </div>
             </div>
           </div>
@@ -514,23 +518,36 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
 
         {/* HEADER */}
         <div className="text-center mb-8 pb-4 border-b border-gray-300 px-4">
-          <h1 className="text-2xl md:text-4xl uppercase tracking-widest mb-1 text-slate-800 break-words" style={{ letterSpacing: '0.1em' }}>
-            {maskText(data.business.name)}
-          </h1>
-          <p className="text-xs md:text-sm italic text-slate-500 font-medium mb-1">
-            {maskText(data.business.specialty)}
-          </p>
-          <p className="text-xs text-slate-600 font-serif uppercase tracking-wider mb-1">
-            {maskText(data.business.address)} • {maskText(data.business.city)}
-          </p>
-          <p className="text-sm font-bold text-slate-800">
-            Tél: {maskText(data.business.phone)}
-          </p>
-          {(data.business.nif || data.business.rccm) && (
-            <p className="text-[10px] text-gray-400 mt-1">
-              {data.business.nif && <span>NIF: {data.business.nif}  </span>}
-              {data.business.rccm && <span>RCCM: {data.business.rccm}</span>}
-            </p>
+          {data.business.customHeaderImage ? (
+            <div className="mb-2 flex justify-center">
+              <img src={data.business.customHeaderImage} alt="En-tête" className="w-full object-contain max-h-40" />
+            </div>
+          ) : (
+            <>
+              {data.business.logo && (
+                <div className="mb-4 flex justify-center">
+                  <img src={data.business.logo} alt="Logo" className="h-20 object-contain" />
+                </div>
+              )}
+              <h1 className="text-2xl md:text-4xl uppercase tracking-widest mb-1 text-slate-800 break-words" style={{ letterSpacing: '0.1em' }}>
+                {maskText(data.business.name)}
+              </h1>
+              <p className="text-xs md:text-sm italic text-slate-500 font-medium mb-1">
+                {maskText(data.business.specialty)}
+              </p>
+              <p className="text-xs text-slate-600 font-serif uppercase tracking-wider mb-1">
+                {maskText(data.business.address)}
+              </p>
+              <p className="text-sm font-bold text-slate-800">
+                Tél: {maskText(data.business.phone)}
+              </p>
+              {(data.business.nif || data.business.rccm) && (
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {data.business.nif && <span>NIF: {data.business.nif}  </span>}
+                  {data.business.rccm && <span>RCCM: {data.business.rccm}</span>}
+                </p>
+              )}
+            </>
           )}
         </div>
 
@@ -552,7 +569,9 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
             </h2>
             <div className="flex flex-col items-start md:items-end gap-0.5 mt-1">
               <p className="text-sm font-bold text-gray-800">N° {maskText(data.number)}</p>
-              <p className="text-sm text-gray-600">{maskDate(data.date)}</p>
+              <p className="text-sm text-gray-600">
+                {maskDate(data.date)} {data.createdAt && !isDraft && <span className="text-xs italic">({new Date(data.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })})</span>}
+              </p>
             </div>
           </div>
         </div>

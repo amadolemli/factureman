@@ -87,7 +87,13 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
     c.history
       .filter(h => h.type === 'PAYMENT')
       .map(h => ({ ...h, customerName: c.customerName }))
-  ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  ).sort((a, b) => {
+    // @ts-ignore - Assuming createdAt might exist on history items soon, or fallback to date
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.date).getTime();
+    // @ts-ignore
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.date).getTime();
+    return timeB - timeA;
+  });
 
   const allAppointments = credits.flatMap(c =>
     (c.appointments || []).map(a => ({ ...a, customerName: c.customerName }))
@@ -114,6 +120,7 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
           type: 'PAYMENT' as const,
           id: Math.random().toString(36),
           date: new Date().toISOString(),
+          createdAt: new Date().toISOString(), // Optimistic createdAt
           amount: amount,
           description: isPrepaidAction ? 'Versement sur compte (Avoir)' : 'Versement reçu'
         }, ...selectedCustomer.history]
@@ -123,6 +130,7 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
   };
 
   const calculateStats = (customer: CreditRecord) => {
+    // ... no change needed here ...
     const totalPurchased = customer.history.filter(h => h.type === 'INVOICE').reduce((acc, h) => acc + h.amount, 0);
     const totalPaid = customer.history.filter(h => h.type === 'PAYMENT').reduce((acc, h) => acc + h.amount, 0);
     const invoicesCount = customer.history.filter(h => h.type === 'INVOICE').length;
@@ -592,7 +600,16 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
                     </div>
                     <div>
                       <p className="text-xs font-black text-gray-900 uppercase">{p.customerName}</p>
-                      <p className="text-[9px] text-gray-400 font-bold">{new Date(p.date).toLocaleDateString()}</p>
+                      <p className="text-[9px] text-gray-400 font-bold">
+                        {new Date(p.date).toLocaleDateString()}
+                        {/* @ts-ignore */}
+                        {p.createdAt && (
+                          <span className="text-gray-300 ml-1">
+                            {/* @ts-ignore */}
+                            {new Date(p.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -772,7 +789,16 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
                     </div>
                     <div>
                       <p className="text-[10px] font-black text-gray-900 uppercase truncate max-w-[150px]">{h.description}</p>
-                      <p className="text-[9px] text-gray-400 font-bold">{new Date(h.date).toLocaleDateString()}</p>
+                      <p className="text-[9px] text-gray-400 font-bold">
+                        {new Date(h.date).toLocaleDateString()}
+                        {/* @ts-ignore */}
+                        {h.createdAt && (
+                          <span className="text-gray-300 ml-1">
+                            {/* @ts-ignore */}
+                            {new Date(h.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="text-right flex items-center gap-3">
