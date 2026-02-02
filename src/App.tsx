@@ -22,6 +22,7 @@ import { supabase } from './services/supabaseClient';
 import AuthScreen from './components/AuthScreen';
 import LandingPage from './components/LandingPage';
 import { dataSyncService } from './services/dataSyncService';
+import { storageService } from './services/storageService';
 import { Session } from '@supabase/supabase-js';
 import { LogOut } from 'lucide-react';
 import { useWallet } from './hooks/useWallet';
@@ -783,289 +784,316 @@ const App: React.FC = () => {
       return newHistory;
     });
 
-    setInvoiceData({ ...finalDoc, creditConfirmed: true, isFinalized: true });
-    setShowSuccessToast(true);
-    setTimeout(() => setShowSuccessToast(false), 3000);
-    setTimeout(() => goToStep(AppStep.PREVIEW), 100);
-  };
+  });
 
-  const handleValidateCredit = (balance: number) => {
-    // Just finalize, logic handles balance internally via credits state
-    finalizeDocument();
-  };
+  // SYNC: Automatic Cloud Backup (Metadata)
+  if (navigator.onLine) {
+    storageService.saveInvoiceToCloud(finalDoc)
+      .then(ok => ok && console.log("Cloud Backup: Metadata Saved"))
+      .catch(err => console.warn("Cloud Backup Failed", err));
+  }
 
-  const handleInstantCash = () => {
-    const total = invoiceData.items.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
-    // Use the higher value: either the calculated total or what the user manually entered (if overpaying)
-    const effectiveAmount = Math.max(total, invoiceData.amountPaid || 0);
-    const paidData = { ...invoiceData, amountPaid: effectiveAmount };
+  setInvoiceData({ ...finalDoc, creditConfirmed: true, isFinalized: true });
+  setShowSuccessToast(true);
+  setTimeout(() => setShowSuccessToast(false), 3000);
+  setTimeout(() => goToStep(AppStep.PREVIEW), 100);
+};
 
-    // Validation immédiate
-    finalizeDocument(paidData);
-  };
+const handleValidateCredit = (balance: number) => {
+  // Just finalize, logic handles balance internally via credits state
+  finalizeDocument();
+};
 
-  const handleSimpleSave = () => {
-    // Pour les documents non-financiers (Devis, Proforma, BL, BC)
-    // On valide sans paiement
-    const savedData = { ...invoiceData, amountPaid: 0 };
-    finalizeDocument(savedData);
-  };
+const handleInstantCash = () => {
+  const total = invoiceData.items.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
+  // Use the higher value: either the calculated total or what the user manually entered (if overpaying)
+  const effectiveAmount = Math.max(total, invoiceData.amountPaid || 0);
+  const paidData = { ...invoiceData, amountPaid: effectiveAmount };
 
-  // Helper to process the cost of a document (Online/Offline)
-  const processDocumentCost = async (): Promise<boolean> => {
-    // 0. CHECK DEBT LOCK
-    if (hasUnpaidDebt) {
-      if (confirm("Action Bloquée : Paiement en attente pour les documents hors-ligne.\nVoulez-vous régler maintenant ?")) {
-        attemptToPayDebt();
-      }
+  // Validation immédiate
+  finalizeDocument(paidData);
+};
+
+const handleSimpleSave = () => {
+  // Pour les documents non-financiers (Devis, Proforma, BL, BC)
+  // On valide sans paiement
+  const savedData = { ...invoiceData, amountPaid: 0 };
+  finalizeDocument(savedData);
+};
+
+// Helper to process the cost of a document (Online/Offline)
+const processDocumentCost = async (): Promise<boolean> => {
+  // 0. CHECK DEBT LOCK
+  if (hasUnpaidDebt) {
+    if (confirm("Action Bloquée : Paiement en attente pour les documents hors-ligne.\nVoulez-vous régler maintenant ?")) {
+      attemptToPayDebt();
+    }
+    return false;
+  }
+
+  const DOC_COST = 10;
+
+  // A. ONLINE
+  if (navigator.onLine) {
+    if ((userProfile?.app_credits || 0) < DOC_COST) {
+      alert("Solde Crédit Insuffisant.\n\nVous avez besoin de 10 crédits pour générer ce document.\nVeuillez recharger votre compte pour continuer.");
       return false;
     }
-
-    const DOC_COST = 10;
-
-    // A. ONLINE
-    if (navigator.onLine) {
-      if ((userProfile?.app_credits || 0) < DOC_COST) {
-        alert("Solde Crédit Insuffisant.\n\nVous avez besoin de 10 crédits pour générer ce document.\nVeuillez recharger votre compte pour continuer.");
-        return false;
-      }
-      const { data: success, error } = await supabase.rpc('deduct_credits', { amount: DOC_COST });
-      if (error || !success) {
-        alert("Erreur de paiement. Veuillez vérifier votre connexion et votre solde.");
-        return false;
-      } setUserProfile(prev => prev ? ({ ...prev, app_credits: prev.app_credits - DOC_COST }) : null);
-      return true;
+    const { data: success, error } = await supabase.rpc('deduct_credits', { amount: DOC_COST });
+    if (error || !success) {
+      alert("Erreur de paiement. Veuillez vérifier votre connexion et votre solde.");
+      return false;
+    } setUserProfile(prev => prev ? ({ ...prev, app_credits: prev.app_credits - DOC_COST }) : null);
+    return true;
+  }
+  // B. OFFLINE
+  else {
+    if (!canPerformAction()) {
+      alert(`Limite hors ligne atteinte (${offlineCount}/${maxOfflineDocs}).\n\nVeuillez vous connecter.`);
+      return false;
     }
-    // B. OFFLINE
-    else {
-      if (!canPerformAction()) {
-        alert(`Limite hors ligne atteinte (${offlineCount}/${maxOfflineDocs}).\n\nVeuillez vous connecter.`);
-        return false;
-      }
-      incrementOfflineCount();
-      return true;
-    }
+    incrementOfflineCount();
+    return true;
+  }
+};
+
+const handleAddPayment = async (customerName: string, amount: number) => {
+  // 1. PAYMENT / LIMIT CHECK
+  const authorized = await processDocumentCost();
+  if (!authorized) return;
+
+  const normalizedName = customerName.toUpperCase();
+  const date = new Date().toISOString();
+  const transactionId = Math.random().toString(36).substr(2, 9);
+
+  // 2. CREATE RECEIPT DOCUMENT (Background)
+  const creditRecord = credits.find(c => c.customerName.toUpperCase() === normalizedName);
+  const currentSnapshot = creditRecord ? creditRecord.remainingBalance : 0;
+
+  // Description logic
+  let desc = 'Versement sur compte client';
+  if (creditRecord && creditRecord.remainingBalance < 0) {
+    desc = `Versement (Solde: ${formatCurrency(Math.abs(creditRecord.remainingBalance))} F Créditeur)`;
+  }
+
+  const receiptDoc: InvoiceData = {
+    id: transactionId,
+    type: DocumentType.RECEIPT,
+    number: `R-${generateInvoiceNumber().split('-')[1]}`,
+    date: date,
+    customerName: customerName,
+    items: [{ id: 'r1', quantity: 1, description: desc, unitPrice: amount }],
+    business: businessInfo,
+    templateId: templatePreference,
+    amountPaid: amount,
+    isFinalized: true,
+    createdAt: date,
+    clientBalanceSnapshot: currentSnapshot - amount // Snapshot AFTER payment
   };
 
-  const handleAddPayment = async (customerName: string, amount: number) => {
-    // 1. PAYMENT / LIMIT CHECK
-    const authorized = await processDocumentCost();
-    if (!authorized) return;
+  setHistory(prev => [receiptDoc, ...prev]);
 
-    const normalizedName = customerName.toUpperCase();
-    const date = new Date().toISOString();
-    const transactionId = Math.random().toString(36).substr(2, 9);
+  // 3. UPDATE LEDGER
+  setCredits(prev => {
+    const existingIdx = prev.findIndex(c => c.customerName.toUpperCase() === normalizedName);
 
-    // 2. CREATE RECEIPT DOCUMENT (Background)
-    const creditRecord = credits.find(c => c.customerName.toUpperCase() === normalizedName);
-    const currentSnapshot = creditRecord ? creditRecord.remainingBalance : 0;
-
-    // Description logic
-    let desc = 'Versement sur compte client';
-    if (creditRecord && creditRecord.remainingBalance < 0) {
-      desc = `Versement (Solde: ${formatCurrency(Math.abs(creditRecord.remainingBalance))} F Créditeur)`;
-    }
-
-    const receiptDoc: InvoiceData = {
+    const moves: CreditHistoryItem[] = [{
+      type: 'PAYMENT' as const,
       id: transactionId,
-      type: DocumentType.RECEIPT,
-      number: `R-${generateInvoiceNumber().split('-')[1]}`,
       date: date,
-      customerName: customerName,
-      items: [{ id: 'r1', quantity: 1, description: desc, unitPrice: amount }],
-      business: businessInfo,
-      templateId: templatePreference,
-      amountPaid: amount,
-      isFinalized: true,
       createdAt: date,
-      clientBalanceSnapshot: currentSnapshot - amount // Snapshot AFTER payment
-    };
+      amount: amount,
+      description: desc
+    }];
 
-    setHistory(prev => [receiptDoc, ...prev]);
+    if (existingIdx !== -1) {
+      const existing = prev[existingIdx];
+      const updatedList = [...prev];
+      updatedList[existingIdx] = {
+        ...existing,
+        remainingBalance: existing.remainingBalance - amount,
+        history: [...moves, ...existing.history]
+      };
+      return updatedList;
+    } else {
+      // Safe fallback for new client (rare in this specific path)
+      return [{
+        id: Math.random().toString(36).substr(2, 9),
+        customerName: normalizedName,
+        customerPhone: '',
+        totalDebt: 0,
+        remainingBalance: -amount, // Negative = Credit
+        history: moves
+      }, ...prev];
+    }
+  });
 
-    // 3. UPDATE LEDGER
-    setCredits(prev => {
-      const existingIdx = prev.findIndex(c => c.customerName.toUpperCase() === normalizedName);
+  // 4. FEEDBACK
+  setShowSuccessToast(true);
+  setTimeout(() => setShowSuccessToast(false), 2000);
+};
 
-      const moves: CreditHistoryItem[] = [{
-        type: 'PAYMENT' as const,
-        id: transactionId,
-        date: date,
-        createdAt: date,
-        amount: amount,
-        description: desc
-      }];
+// Modified to just VIEW the receipt (since it's now created at payment time)
+// But strictly speaking, if called with ID, we find it. If not found (legacy?), we creates it? 
+// Let's keep it simple: It tries to find it.
+const handleGenerateReceipt = async (customerName: string, amount: number, date: string, transactionId?: string) => {
+  // Try to find by Transaction ID first (best link) or fallback logic
+  const existing = history.find(h => h.id === transactionId);
 
-      if (existingIdx !== -1) {
-        const existing = prev[existingIdx];
-        const updatedList = [...prev];
-        updatedList[existingIdx] = {
-          ...existing,
-          remainingBalance: existing.remainingBalance - amount,
-          history: [...moves, ...existing.history]
-        };
-        return updatedList;
-      } else {
-        // Safe fallback for new client (rare in this specific path)
-        return [{
-          id: Math.random().toString(36).substr(2, 9),
-          customerName: normalizedName,
-          customerPhone: '',
-          totalDebt: 0,
-          remainingBalance: -amount, // Negative = Credit
-          history: moves
-        }, ...prev];
-      }
+  if (existing) {
+    setInvoiceData(existing);
+    goToStep(AppStep.PREVIEW);
+  } else {
+    // Fallback: If for some reason it wasn't created (e.g. legacy data), create it now using the OLD logic?
+    // Or just alert? 
+    // Let's assume for new flow, it exists.
+    alert("Reçu introuvable ou ancien format.");
+  }
+};
+
+
+
+const resetInvoice = () => {
+  setInvoiceData({
+    id: Math.random().toString(36).substr(2, 9),
+    type: DocumentType.INVOICE,
+    number: generateInvoiceNumber(),
+    date: new Date().toISOString().split('T')[0],
+    customerName: '',
+    customerPhone: '',
+    items: [{ id: Math.random().toString(36).substr(2, 9), quantity: 1, description: '', unitPrice: 0 }],
+    business: businessInfo,
+    templateId: templatePreference,
+    amountPaid: 0,
+    isFinalized: false,
+    creditConfirmed: false
+  });
+
+  goToStep(AppStep.FORM);
+};
+
+const handlePrint = async () => {
+  if (!invoiceData.isFinalized) {
+    await finalizeDocument();
+  }
+  setTimeout(() => window.print(), 500);
+};
+
+const handleShareWhatsApp = (targetDoc?: InvoiceData) => {
+  const doc = targetDoc || invoiceData;
+  const total = doc.items.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
+  const amountPaid = doc.amountPaid || 0;
+
+  // Récupérer le solde global actuel du client si dispo
+  const customerCredit = credits.find(c => c.customerName.toUpperCase() === doc.customerName.toUpperCase());
+  const totalGlobalBalance = customerCredit ? customerCredit.remainingBalance : 0;
+
+  let message = `*✅ ${doc.business.name.toUpperCase()}*\n`;
+  message += `*📄 ${doc.type.toUpperCase()} N° :* ${doc.number}\n`;
+  message += `*👤 CLIENT :* ${doc.customerName || 'Client Comptant'}\n`;
+
+  if (doc.type === DocumentType.RECEIPT) {
+    message += `\n*💰 MONTANT REÇU : ${formatCurrency(amountPaid)} F CFA*\n`;
+    message += `_Objet : Versement_\n`;
+  } else {
+    message += `\n*📦 DÉTAILS :*\n`;
+    doc.items.forEach(item => {
+      if (item.description) message += `• ${item.quantity}x ${item.description} : ${formatCurrency(item.quantity * item.unitPrice)} F\n`;
     });
+    message += `\n*💰 TOTAL : ${formatCurrency(total)} F CFA*`;
+    if (amountPaid > 0) message += `\n*💵 PAYÉ : ${formatCurrency(amountPaid)} F*`;
+  }
 
-    // 4. FEEDBACK
+  if (totalGlobalBalance !== 0) {
+    if (totalGlobalBalance < 0) {
+      message += `\n\n*🟢 SOLDE DISPONIBLE (AVOIR) : ${formatCurrency(Math.abs(totalGlobalBalance))} F CFA*`;
+    } else {
+      message += `\n\n*🔴 VOTRE DETTE TOTALE : ${formatCurrency(totalGlobalBalance)} F CFA*`;
+    }
+  }
+
+  message += `\n\n_Merci de votre confiance !_`;
+  const encodedMessage = encodeURIComponent(message);
+  // Nettoyage basique du numéro
+  const phone = doc.customerPhone ? doc.customerPhone.replace(/\s/g, '').replace(/\+/g, '') : '';
+  const whatsappUrl = phone ? `https://wa.me/${phone}?text=${encodedMessage}` : `https://wa.me/?text=${encodedMessage}`;
+
+  // PDF Generation
+  const invoiceElement = document.getElementById('invoice-preview-container');
+  if (invoiceElement) {
     setShowSuccessToast(true);
-    setTimeout(() => setShowSuccessToast(false), 2000);
-  };
+    setTimeout(() => setShowSuccessToast(false), 3000);
 
-  // Modified to just VIEW the receipt (since it's now created at payment time)
-  // But strictly speaking, if called with ID, we find it. If not found (legacy?), we creates it? 
-  // Let's keep it simple: It tries to find it.
-  const handleGenerateReceipt = async (customerName: string, amount: number, date: string, transactionId?: string) => {
-    // Try to find by Transaction ID first (best link) or fallback logic
-    const existing = history.find(h => h.id === transactionId);
-
-    if (existing) {
-      setInvoiceData(existing);
-      goToStep(AppStep.PREVIEW);
-    } else {
-      // Fallback: If for some reason it wasn't created (e.g. legacy data), create it now using the OLD logic?
-      // Or just alert? 
-      // Let's assume for new flow, it exists.
-      alert("Reçu introuvable ou ancien format.");
-    }
-  };
-
-
-
-  const resetInvoice = () => {
-    setInvoiceData({
-      id: Math.random().toString(36).substr(2, 9),
-      type: DocumentType.INVOICE,
-      number: generateInvoiceNumber(),
-      date: new Date().toISOString().split('T')[0],
-      customerName: '',
-      customerPhone: '',
-      items: [{ id: Math.random().toString(36).substr(2, 9), quantity: 1, description: '', unitPrice: 0 }],
-      business: businessInfo,
-      templateId: templatePreference,
-      amountPaid: 0,
-      isFinalized: false,
-      creditConfirmed: false
-    });
-
-    goToStep(AppStep.FORM);
-  };
-
-  const handlePrint = async () => {
-    if (!invoiceData.isFinalized) {
-      await finalizeDocument();
-    }
-    setTimeout(() => window.print(), 500);
-  };
-
-  const handleShareWhatsApp = (targetDoc?: InvoiceData) => {
-    const doc = targetDoc || invoiceData;
-    const total = doc.items.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
-    const amountPaid = doc.amountPaid || 0;
-
-    // Récupérer le solde global actuel du client si dispo
-    const customerCredit = credits.find(c => c.customerName.toUpperCase() === doc.customerName.toUpperCase());
-    const totalGlobalBalance = customerCredit ? customerCredit.remainingBalance : 0;
-
-    let message = `*✅ ${doc.business.name.toUpperCase()}*\n`;
-    message += `*📄 ${doc.type.toUpperCase()} N° :* ${doc.number}\n`;
-    message += `*👤 CLIENT :* ${doc.customerName || 'Client Comptant'}\n`;
-
-    if (doc.type === DocumentType.RECEIPT) {
-      message += `\n*💰 MONTANT REÇU : ${formatCurrency(amountPaid)} F CFA*\n`;
-      message += `_Objet : Versement_\n`;
-    } else {
-      message += `\n*📦 DÉTAILS :*\n`;
-      doc.items.forEach(item => {
-        if (item.description) message += `• ${item.quantity}x ${item.description} : ${formatCurrency(item.quantity * item.unitPrice)} F\n`;
-      });
-      message += `\n*💰 TOTAL : ${formatCurrency(total)} F CFA*`;
-      if (amountPaid > 0) message += `\n*💵 PAYÉ : ${formatCurrency(amountPaid)} F*`;
-    }
-
-    if (totalGlobalBalance !== 0) {
-      if (totalGlobalBalance < 0) {
-        message += `\n\n*🟢 SOLDE DISPONIBLE (AVOIR) : ${formatCurrency(Math.abs(totalGlobalBalance))} F CFA*`;
-      } else {
-        message += `\n\n*🔴 VOTRE DETTE TOTALE : ${formatCurrency(totalGlobalBalance)} F CFA*`;
-      }
-    }
-
-    message += `\n\n_Merci de votre confiance !_`;
-    const encodedMessage = encodeURIComponent(message);
-    // Nettoyage basique du numéro
-    const phone = doc.customerPhone ? doc.customerPhone.replace(/\s/g, '').replace(/\+/g, '') : '';
-    const whatsappUrl = phone ? `https://wa.me/${phone}?text=${encodedMessage}` : `https://wa.me/?text=${encodedMessage}`;
-
-    // PDF Generation
-    const invoiceElement = document.getElementById('invoice-preview-container');
-    if (invoiceElement) {
-      setShowSuccessToast(true);
-      setTimeout(() => setShowSuccessToast(false), 3000);
-
+    html2canvas(invoiceElement, {
+      scale: 1.5,
+      useCORS: true,
+      windowWidth: 1200,
+      backgroundColor: '#ffffff'
       html2canvas(invoiceElement, {
         scale: 1.5,
         useCORS: true,
         windowWidth: 1200,
         backgroundColor: '#ffffff'
-      }).then(canvas => {
-        const imgData = canvas.toDataURL('image/jpeg', 0.8);
-        const pdf = new jsPDF('p', 'mm', 'a4');
+      }).then(async canvas => {
+          const imgData = canvas.toDataURL('image/jpeg', 0.8);
+          const pdf = new jsPDF('p', 'mm', 'a4');
 
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
 
-        const imgProps = pdf.getImageProperties(imgData);
-        const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          const imgProps = pdf.getImageProperties(imgData);
+          const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        let heightLeft = imgHeight;
-        let position = 0;
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          let heightLeft = imgHeight;
+          let position = 0;
 
-        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
-        heightLeft -= pageHeight;
-
-        while (heightLeft > 0) {
-          position = position - pageHeight;
-          pdf.addPage();
           pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
           heightLeft -= pageHeight;
-        }
 
-        const pdfBlob = pdf.output('blob');
-        const pdfFile = new File([pdfBlob], `Facture_${doc.number}.pdf`, { type: 'application/pdf' });
+          while (heightLeft > 0) {
+            position = position - pageHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+            heightLeft -= pageHeight;
+          }
 
-        if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
-          navigator.share({
-            files: [pdfFile],
-            title: `Facture ${doc.number}`,
-            text: message
-          }).catch((err) => {
-            console.error("Share failed:", err);
-            // Fallback if user cancels or error
+          const pdfBlob = pdf.output('blob');
+          const pdfFile = new File([pdfBlob], `Facture_${doc.number}.pdf`, { type: 'application/pdf' });
+
+          // SYNC: Upload PDF to Cloud Storage
+          if (navigator.onLine) {
+            const safeName = `Facture_${doc.number.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
+            storageService.uploadInvoicePDF(pdfBlob, safeName)
+              .then(publicUrl => {
+                if (publicUrl) {
+                  console.log("Cloud Backup: PDF Uploaded", publicUrl);
+                  return storageService.saveInvoiceToCloud(doc, publicUrl);
+                }
+              })
+              .catch(err => console.warn("PDF Cloud Upload Failed", err));
+          }
+
+          if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
+            navigator.share({
+              files: [pdfFile],
+              title: `Facture ${doc.number}`,
+              text: message
+            }).catch((err) => {
+              console.error("Share failed:", err);
+              // Fallback if user cancels or error
+              pdf.save(`Facture_${doc.number}.pdf`);
+              setTimeout(() => window.open(whatsappUrl, '_blank'), 500);
+            });
+          } else {
+            // Fallback for Desktop or unsupported browsers
             pdf.save(`Facture_${doc.number}.pdf`);
-            setTimeout(() => window.open(whatsappUrl, '_blank'), 500);
-          });
-        } else {
-          // Fallback for Desktop or unsupported browsers
-          pdf.save(`Facture_${doc.number}.pdf`);
-          setTimeout(() => {
-            window.open(whatsappUrl, '_blank');
-            alert("Le PDF a été téléchargé.\n\nVeuillez joindre le fichier 'Facture_" + doc.number + ".pdf' dans la conversation WhatsApp qui va s'ouvrir.");
-          }, 1000);
-        }
-      });
+            setTimeout(() => {
+              window.open(whatsappUrl, '_blank');
+              alert("Le PDF a été téléchargé.\n\nVeuillez joindre le fichier 'Facture_" + doc.number + ".pdf' dans la conversation WhatsApp qui va s'ouvrir.");
+            }, 1000);
+          }
+        });
     } else {
       window.open(whatsappUrl, '_blank');
     }
