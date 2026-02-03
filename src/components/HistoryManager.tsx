@@ -187,7 +187,7 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
                         </button>
 
                         {activeConvertId === item.id && (
-                          <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl z-20 p-2 w-48 animate-in zoom-in duration-200">
+                          <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl z-20 p-2 w-48 animate-in zoom-in duration-200">
                             <div className="flex justify-between items-center px-2 py-1 mb-1 border-b">
                               <span className="text-[8px] font-black uppercase text-gray-400">Convertir vers :</span>
                               <button onClick={() => setActiveConvertId(null)}><X size={12} /></button>

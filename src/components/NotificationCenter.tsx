@@ -50,7 +50,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, 
                         className="fixed inset-0 bg-transparent z-40"
                         onClick={() => setIsOpen(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="fixed top-[68px] left-2 right-2 sm:absolute sm:top-full sm:right-0 sm:left-auto sm:w-96 sm:mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
                                 <Bell size={16} className="text-blue-600" /> Notifications
@@ -80,9 +80,9 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, 
                                             onClick={() => onMarkAsRead(notif.id)}
                                         >
                                             <div className={`mt-1 h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${notif.type === 'warning' ? 'bg-amber-100 text-amber-600' :
-                                                    notif.type === 'alert' ? 'bg-red-100 text-red-600' :
-                                                        notif.type === 'success' ? 'bg-green-100 text-green-600' :
-                                                            'bg-blue-100 text-blue-600'
+                                                notif.type === 'alert' ? 'bg-red-100 text-red-600' :
+                                                    notif.type === 'success' ? 'bg-green-100 text-green-600' :
+                                                        'bg-blue-100 text-blue-600'
                                                 }`}>
                                                 {notif.type === 'warning' && <AlertTriangle size={14} />}
                                                 {notif.type === 'alert' && <Wallet size={14} />}
