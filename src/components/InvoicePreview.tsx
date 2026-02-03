@@ -106,6 +106,15 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           </div>
         )}
 
+        {/* WATERMARK IMPAYÉ */}
+        {!isDraft && data.type === DocumentType.INVOICE && amountPaid === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center p-10 pointer-events-none opacity-20 overflow-hidden z-0">
+            <p className="text-9xl font-black text-red-500 -rotate-45 whitespace-nowrap select-none border-8 border-red-500 p-10 rounded-[3rem]">
+              IMPAYÉ
+            </p>
+          </div>
+        )}
+
         <div className="flex-grow">
           <table className="w-full border-2 border-gray-800">
             <thead>
@@ -478,6 +487,15 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
             </div>
           )}
 
+          {/* WATERMARK IMPAYÉ */}
+          {!isDraft && data.type === DocumentType.INVOICE && amountPaid === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center p-10 pointer-events-none opacity-20 overflow-hidden z-0">
+              <p className="text-9xl font-black text-red-500 -rotate-45 whitespace-nowrap select-none border-8 border-red-500 p-10 rounded-[3rem]">
+                IMPAYÉ
+              </p>
+            </div>
+          )}
+
 
           {showClientBalance && (
             <div className={`mt-8 p-4 rounded-xl border ${balanceToShow < 0 ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-red-50 border-red-100 text-red-800'} flex justify-between items-center`}>
@@ -581,6 +599,15 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 z-0">
             <p className="text-[120px] font-bold text-gray-400 -rotate-45 whitespace-nowrap select-none border-[12px] border-gray-400 p-12 rounded-[3rem]">
               BROUILLON
+            </p>
+          </div>
+        )}
+
+        {/* WATERMARK IMPAYÉ */}
+        {!isDraft && data.type === DocumentType.INVOICE && amountPaid === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 z-0">
+            <p className="text-[120px] font-bold text-red-500 -rotate-45 whitespace-nowrap select-none border-[12px] border-red-500 p-12 rounded-[3rem]">
+              IMPAYÉ
             </p>
           </div>
         )}

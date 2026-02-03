@@ -1320,7 +1320,18 @@ const App: React.FC = () => {
           {/* LEFT SECTION: NAVIGATION */}
           <div className="flex items-center gap-3">
             {step === AppStep.PREVIEW ? (
-              <button onClick={() => goToStep(previousStep)} className="bg-red-50 text-red-500 p-2 rounded-xl active:scale-90 font-bold flex items-center gap-2 text-xs border border-red-100"><ArrowLeft size={18} /> Fermer</button>
+              <button
+                onClick={() => {
+                  if (invoiceData.isFinalized) {
+                    resetInvoice();
+                  } else {
+                    goToStep(previousStep);
+                  }
+                }}
+                className="bg-red-50 text-red-500 p-2 rounded-xl active:scale-90 font-bold flex items-center gap-2 text-xs border border-red-100"
+              >
+                <ArrowLeft size={18} /> Fermer
+              </button>
             ) : (
               <div className="flex items-center gap-3">
                 {step !== AppStep.FORM && (

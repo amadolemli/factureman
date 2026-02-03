@@ -46,11 +46,20 @@ export const notificationService = {
                 // Double check si toujours valide (pas annulé)
                 const currentScheduled = JSON.parse(localStorage.getItem('mali_facture_notifications') || '{}');
                 if (currentScheduled[id]) {
+                    // 1. Play Sound
+                    try {
+                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Simple 'Ding' sound
+                        audio.volume = 0.5;
+                        audio.play().catch(e => console.warn("Audio play blocked", e));
+                    } catch (e) { }
+
+                    // 2. Show Notification
                     new Notification(title, {
                         body: body,
-                        icon: '/icon.png', // Fallback icon path
+                        icon: '/pwa-192x192.png', // Correct PWA Icon
                         requireInteraction: true
                     });
+
                     // Nettoyer après envoi
                     delete currentScheduled[id];
                     localStorage.setItem('mali_facture_notifications', JSON.stringify(currentScheduled));

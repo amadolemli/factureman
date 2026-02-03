@@ -126,8 +126,8 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
 
             return (
               <div key={item.id} className={`bg-white rounded-2xl border shadow-sm group hover:border-blue-300 transition-all ${isUnpaid ? 'border-orange-200' : 'border-gray-100'}`}>
-                <div className="p-4 flex items-center justify-between relative">
-                  <div className="flex items-center gap-4">
+                <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
+                  <div className="flex items-center gap-4 w-full sm:w-auto">
                     <div className={`p-3 rounded-xl border ${getBadgeColors(item.type)}`}>
                       {isReceipt ? <Receipt size={24} /> : <FileText size={24} />}
                     </div>
@@ -147,7 +147,7 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
                           </span>
                         )}
                       </div>
-                      <h3 className="font-bold text-gray-900 uppercase truncate max-w-[120px] sm:max-w-none text-xs">
+                      <h3 className="font-bold text-gray-900 uppercase truncate text-xs">
                         {item.customerName || "Client Comptant"}
                       </h3>
                       <div className="flex items-center gap-3 mt-1">
@@ -167,7 +167,7 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 sm:gap-2">
+                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 border-gray-50 pt-3 sm:pt-0">
                     <button
                       onClick={() => onShare(item)}
                       className="p-2.5 text-[#25D366] hover:bg-green-50 rounded-xl transition-colors active:scale-90"
