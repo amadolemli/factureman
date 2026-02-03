@@ -27,12 +27,18 @@ export const extractItemsFromImage = async (base64Data: string, mimeType: string
       if (response.ok) {
         return await response.json();
       } else {
-        console.warn(`Server Scan Failed (${response.status}). Switching to Client Fallback.`);
+        console.warn(`Server Scan Failed (${response.status}).`);
+        if (!import.meta.env.DEV) {
+          throw new Error(`Le service de scan est indisponible momentanément (${response.status}). Veuillez réessayer plus tard.`);
+        }
       }
     } else {
-      console.warn("No Session. Switching to Client Fallback (Demo/Local Mode).");
+      console.warn("No Session.");
+      if (!import.meta.env.DEV) {
+        throw new Error("Veuillez vous connecter au compte (Profil) pour utiliser le scanner.");
+      }
     }
-    throw new Error("Trigger Fallback"); // Trigger catch block for fallback
+    throw new Error("Trigger Fallback"); // Jump to catch block (Dev Mode only)
 
   } catch (serverError) {
     // 2. CLIENT-SIDE FALLBACK (Localhost / Offline / Server Error)

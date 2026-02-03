@@ -403,6 +403,27 @@ const App: React.FC = () => {
       if (result.success) {
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 3000);
+
+        // --- PULL: Fetch latest changes from other devices ---
+        try {
+          const cloudData = await dataSyncService.fetchUserData(session.user.id);
+          if (cloudData) {
+            const mergeArrays = <T extends { id: string }>(local: T[], cloud: T[]): T[] => {
+              const map = new Map<string, T>();
+              cloud.forEach(item => map.set(item.id, item));
+              local.forEach(item => map.set(item.id, item));
+              return Array.from(map.values());
+            };
+
+            setProducts(prev => mergeArrays(prev, cloudData.products));
+            setHistory(prev => mergeArrays(prev, cloudData.history));
+            setCredits(prev => mergeArrays(prev, cloudData.credits));
+            // Note: We don't overwrite Business Info automatically to avoid annoying resets while editing
+          }
+        } catch (e) {
+          console.warn("Auto-Pull Failed", e);
+        }
+
       } else {
         setSyncStatus('error');
       }
