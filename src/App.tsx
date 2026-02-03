@@ -1506,7 +1506,7 @@ const App: React.FC = () => {
             onValidateCredit={handleValidateCredit}
             onPayCash={handleInstantCash}
             onSaveDoc={handleSimpleSave}
-            onClearAll={resetInvoice}
+            onClearAll={() => resetInvoice()}
           />
         )}
 
@@ -1625,7 +1625,7 @@ const App: React.FC = () => {
                   </button>
                 </>
               ) : (
-                <button onClick={resetInvoice} className="w-full bg-white text-gray-900 py-4 rounded-2xl font-black uppercase border-2 border-gray-200 shadow-sm flex items-center justify-center gap-3 active:scale-95 hover:bg-gray-50 transition-colors">
+                <button onClick={() => resetInvoice()} className="w-full bg-white text-gray-900 py-4 rounded-2xl font-black uppercase border-2 border-gray-200 shadow-sm flex items-center justify-center gap-3 active:scale-95 hover:bg-gray-50 transition-colors">
                   <Plus size={24} /> Nouvelle Facture / Opération
                 </button>
               )}
@@ -1655,7 +1655,7 @@ const App: React.FC = () => {
           <div className="w-full max-w-4xl px-6 py-2 flex justify-between items-center">
             <button onClick={() => goToStep(AppStep.CREDIT)} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${step === AppStep.CREDIT ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}><Wallet size={20} /><span className="text-[8px] font-black uppercase tracking-widest">GESTION</span></button>
             <button onClick={() => goToStep(AppStep.HISTORY)} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${step === AppStep.HISTORY ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}><Clock size={20} /><span className="text-[8px] font-black uppercase tracking-widest">Historique</span></button>
-            <button onClick={() => goToStep(AppStep.FORM)} onDoubleClick={resetInvoice} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${step === AppStep.FORM ? 'bg-blue-600 text-white shadow-lg -translate-y-2 scale-110' : 'text-gray-400 hover:text-gray-600'}`}><LayoutDashboard size={20} /><span className="text-[8px] font-black uppercase tracking-widest">Saisie</span></button>
+            <button onClick={() => goToStep(AppStep.FORM)} onDoubleClick={() => resetInvoice()} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${step === AppStep.FORM ? 'bg-blue-600 text-white shadow-lg -translate-y-2 scale-110' : 'text-gray-400 hover:text-gray-600'}`}><LayoutDashboard size={20} /><span className="text-[8px] font-black uppercase tracking-widest">Saisie</span></button>
             <button onClick={() => goToStep(AppStep.STOCK)} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${step === AppStep.STOCK ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}><Package size={20} /><span className="text-[8px] font-black uppercase tracking-widest">Stock</span></button>
             <button onClick={() => goToStep(AppStep.PROFILE)} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${step === AppStep.PROFILE ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}><UserCircle size={20} /><span className="text-[8px] font-black uppercase tracking-widest">Profil</span></button>
           </div>
