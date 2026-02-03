@@ -971,7 +971,7 @@ const App: React.FC = () => {
 
 
 
-  const resetInvoice = () => {
+  const resetInvoice = (navigateToForm = true) => {
     setInvoiceData({
       id: Math.random().toString(36).substr(2, 9),
       type: DocumentType.INVOICE,
@@ -987,7 +987,9 @@ const App: React.FC = () => {
       creditConfirmed: false
     });
 
-    goToStep(AppStep.FORM);
+    if (navigateToForm) {
+      goToStep(AppStep.FORM);
+    }
   };
 
   const handlePrint = async () => {
@@ -1343,7 +1345,13 @@ const App: React.FC = () => {
               <button
                 onClick={() => {
                   if (invoiceData.isFinalized) {
-                    resetInvoice();
+                    // Smart Navigation: Return to origin if possible
+                    if (previousStep === AppStep.HISTORY || previousStep === AppStep.CREDIT) {
+                      resetInvoice(false); // Don't jump to form
+                      goToStep(previousStep);
+                    } else {
+                      resetInvoice(true); // Default: New Invoice
+                    }
                   } else {
                     goToStep(previousStep);
                   }
