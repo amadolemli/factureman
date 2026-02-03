@@ -46,17 +46,23 @@ export default async function handler(request: Request) {
         }
 
         // 3. SECURITY: Payment (Deduct Credits)
+        // DISABLED BY DEFAULT: Credits are managed locally in the "Smart Wallet".
+        // Server balance might be 0 while user has local credits.
+        // We rely on the Client App to deduct local credits (handled in useScanner.ts).
+
+        /* 
         const SCAN_COST = 40;
         const { data: canAfford, error: paymentError } = await supabase.rpc('deduct_credits', { amount: SCAN_COST });
 
         if (paymentError) {
-            console.error("Payment Error:", paymentError);
-            return new Response(JSON.stringify({ error: 'Payment Processing Failed' }), { status: 500 });
+             console.error("Payment Error:", paymentError);
+             return new Response(JSON.stringify({ error: 'Payment Processing Failed' }), { status: 500 });
         }
 
         if (!canAfford) {
             return new Response(JSON.stringify({ error: 'Insufficent Server Credits. Please recharge your account.' }), { status: 402 });
         }
+        */
 
         // 4. CONTINUE: Configuration Check
         const apiKey = process.env.GEMINI_API_KEY;
@@ -124,15 +130,9 @@ export default async function handler(request: Request) {
         } catch (aiError: any) {
             console.error("AI/Parsing Error - Refunding Credits:", aiError);
 
-            // REFUND LOGIC
-            // We pass negative amount to 'deduct' to add back credits.
-            const { error: refundError } = await supabase.rpc('deduct_credits', { amount: -SCAN_COST });
-
-            if (refundError) {
-                console.error("CRITICAL: Refund Failed:", refundError);
-            } else {
-                console.log("Refund Successful.");
-            }
+            // REFUND LOGIC (DISABLED)
+            // const { error: refundError } = await supabase.rpc('deduct_credits', { amount: -SCAN_COST });
+            // if (refundError) console.error("CRITICAL: Refund Failed:", refundError);
 
             // Continue to return error to client
             throw aiError;
