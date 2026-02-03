@@ -41,25 +41,25 @@ export const extractItemsFromImage = async (base64Data: string, mimeType: string
     throw new Error("Trigger Fallback"); // Jump to catch block (Dev Mode only)
 
   } catch (serverError) {
-    // 2. CLIENT-SIDE FALLBACK (Localhost / Offline / Server Error)
-    // ONLY ALLOWED IN DEV MODE
-    if (import.meta.env.DEV) {
-      console.log("DEV MODE DETECTED: Executing Client-Side Fallback Scan...");
+    // 2. CLIENT-SIDE FALLBACK (Localhost / Offline / Server Error / Payment Error)
+    console.log("Server Scan Failed or Skipped. Executing Client-Side Fallback Scan...");
 
-      const storedKey = localStorage.getItem('user_gemini_api_key');
-      const envKey = import.meta.env.VITE_GEMINI_API_KEY;
-      const API_KEY = (storedKey || envKey || "").trim();
+    const storedKey = localStorage.getItem('user_gemini_api_key');
+    const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const API_KEY = (storedKey || envKey || "").trim();
 
-      if (!API_KEY) {
-        throw new Error("DEV MODE: Le scan serveur a échoué et aucune Clé API locale (VITE_GEMINI_API_KEY) n'est configurée.");
-      }
+    if (!API_KEY) {
+      // If we are in PROD and have no key, we unfortunately have to fail.
+      // But usually VITE_GEMINI_API_KEY is present if deployed correctly.
+      throw new Error("Échec du scan serveur et aucune Clé API de secours n'est disponible.");
+    }
 
-      try {
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        // Use flash model for speed and efficiency
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    try {
+      const genAI = new GoogleGenerativeAI(API_KEY);
+      // Use flash model for speed and efficiency
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-        const prompt = `
+      const prompt = `
             RÔLE : Machine de transcription OCR stricte.
             TÂCHE : Transcrire le document EXACTEMENT mot pour mot.
             
@@ -82,30 +82,25 @@ export const extractItemsFromImage = async (base64Data: string, mimeType: string
             }
             `;
 
-        const result = await model.generateContent([
-          prompt,
-          {
-            inlineData: {
-              data: base64Data,
-              mimeType: mimeType
-            }
+      const result = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            data: base64Data,
+            mimeType: mimeType
           }
-        ]);
+        }
+      ]);
 
-        const response = await result.response;
-        const text = response.text();
-        const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const response = await result.response;
+      const text = response.text();
+      const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
-        return JSON.parse(cleanedText);
+      return JSON.parse(cleanedText);
 
-      } catch (clientError: any) {
-        console.error("Client Scan Error:", clientError);
-        throw new Error("Échec du scan DEV : " + (clientError.message || String(clientError)));
-      }
-    } else {
-      // PRODUCTION: Re-throw server error (No fallback allowed)
-      console.error("Server Scan Failed in Production. Fallback blocked for security.");
-      throw serverError;
+    } catch (clientError: any) {
+      console.error("Client Scan Error:", clientError);
+      throw new Error("Échec du scan : " + (clientError.message || String(clientError)));
     }
   }
 };
