@@ -47,11 +47,11 @@ export const extractItemsFromImage = async (base64Data: string, mimeType: string
     if (import.meta.env.DEV) {
       console.log("DEV MODE DETECTED: Executing Client-Side Fallback Scan...");
       const storedKey = localStorage.getItem('user_gemini_api_key');
-      const envKey = import.meta.env.VITE_GEMINI_API_KEY;
-      const API_KEY = (storedKey || envKey || "").trim();
+      // const envKey = import.meta.env.VITE_GEMINI_API_KEY; // REMOVED FOR SECURITY
+      const API_KEY = (storedKey || "").trim();
 
       if (!API_KEY) {
-        throw new Error("DEV MODE: Le scan serveur a échoué et aucune Clé API locale n'est configurée.");
+        throw new Error("DEV MODE: Le scan serveur a échoué et aucune Clé API locale n'est configurée (Entrez-la dans les paramètres).");
       }
 
       try {
@@ -77,10 +77,10 @@ export const extractItemsFromImage = async (base64Data: string, mimeType: string
 
 export const testGeminiConnection = async (): Promise<{ success: boolean; message: string }> => {
   const storedKey = localStorage.getItem('user_gemini_api_key');
-  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
-  const API_KEY = (storedKey || envKey || "").trim();
+  // const envKey = import.meta.env.VITE_GEMINI_API_KEY; // REMOVED FOR SECURITY
+  const API_KEY = (storedKey || "").trim();
 
-  if (!API_KEY) return { success: false, message: "Aucune clé API trouvée. Veuillez en saisir une." };
+  if (!API_KEY) return { success: false, message: "Aucune clé API locale trouvée. Veuillez en saisir une." };
 
   try {
     const genAI = new GoogleGenerativeAI(API_KEY);
