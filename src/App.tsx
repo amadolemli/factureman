@@ -605,10 +605,9 @@ const App: React.FC = () => {
         if (matchCount > 0) alert(`${matchCount} article(s) reconnu(s) dans le catalogue !`);
       }
 
-      // DEDUCT PROCESING FEE (Local Wallet)
-      // Note: The heavy scan cost (40) is now paid Server-Side. 
-      // We only deduct a small processing fee (10) from the local wallet for app usage.
-      const PROCESSING_FEE = 10;
+      // DEDUCT SCAN COST (Local Wallet)
+      // Server Deduction is disabled, so we deduct the full cost (40) locally.
+      const PROCESSING_FEE = 40;
       setWalletCredits(prev => prev - PROCESSING_FEE);
 
       setShowSuccessToast(true);

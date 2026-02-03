@@ -90,6 +90,7 @@ export default async function handler(request: Request) {
           3. PAS DE CORRECTION : Ne corrige pas les fautes d'orthographe. Transcris ce que tu vois.
           4. ECRIS 'INCONNU' si une valeur (prix/quantité) est illisible. NE DEVINE PAS.
           5. FORMAT JSON VALIDE : Les nombres doivent être valides (Pas de "05", mais 5. Pas de "17.500", mais 17500).
+          6. QUANTITÉS : Traite "02" comme 2, "05" comme 5. Les zéros au début ne comptent pas pour la quantité.
 
           ${context ? `CONTEXTE (Uniquement pour désambiguïser des lettres floues, PAS pour compléter) : L'utilisateur vend : ${context}.` : ""}
 
