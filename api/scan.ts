@@ -30,6 +30,31 @@ export default async function handler(request: Request) {
             return new Response(JSON.stringify({ error: 'Unauthorized: Invalid Token' }), { status: 401 });
         }
 
+        // 1.5 SECURITY: CSRF Protection (Origin Check)
+        const origin = request.headers.get('origin');
+        const referer = request.headers.get('referer');
+
+        // Build allowed origins list
+        const ALLOWED_ORIGINS = [
+            process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+            process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null,
+            'http://localhost:5173',
+            'http://localhost:4173',
+            'http://127.0.0.1:5173'
+        ].filter(Boolean);
+
+        // Check origin
+        if (origin && !ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed as string))) {
+            console.warn('CSRF attempt detected from:', origin);
+            return new Response(JSON.stringify({ error: 'Invalid origin' }), { status: 403 });
+        }
+
+        // Fallback: Check referer if origin is missing (some browsers)
+        if (!origin && referer && !ALLOWED_ORIGINS.some(allowed => referer.startsWith(allowed as string))) {
+            console.warn('CSRF attempt detected from referer:', referer);
+            return new Response(JSON.stringify({ error: 'Invalid referer' }), { status: 403 });
+        }
+
         // 2. SECURITY: Rate Limiting (Spam Check)
         // Call the database function to check and update the rate limit
         const { data: allowed, error: rpcError } = await supabase.rpc('check_scan_rate_limit');

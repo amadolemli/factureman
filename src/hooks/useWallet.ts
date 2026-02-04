@@ -21,6 +21,38 @@ export const useWallet = (
         });
     };
 
+    // Security: Verify wallet integrity against server balance
+    const verifyWalletIntegrity = async () => {
+        if (!session?.user?.id || !userProfile) return;
+
+        try {
+            const { data, error } = await supabase.rpc('verify_wallet_integrity', {
+                claimed_wallet_credits: walletCredits
+            });
+
+            if (error) {
+                console.warn('Wallet verification failed:', error);
+                return;
+            }
+
+            if (data && data.length > 0) {
+                const result = data[0];
+
+                // If wallet is invalid (manipulated), correct it
+                if (!result.is_valid) {
+                    console.warn('⚠️ Wallet manipulation detected! Syncing with server...');
+                    const correctedAmount = result.corrected_wallet;
+                    setWalletCredits(correctedAmount);
+
+                    // Optionally notify user
+                    alert(`Synchronisation du portefeuille : ${correctedAmount} crédits disponibles.`);
+                }
+            }
+        } catch (err) {
+            console.error('Wallet verification error:', err);
+        }
+    };
+
     // Load Wallet on Session Change
     useEffect(() => {
         if (session?.user?.id) {
@@ -30,7 +62,25 @@ export const useWallet = (
         }
     }, [session]);
 
+    // Verify wallet periodically (every 2 minutes)
+    useEffect(() => {
+        if (!session?.user?.id) return;
+
+        // Initial verification
+        const timer = setTimeout(() => verifyWalletIntegrity(), 5000);
+
+        // Periodic verification
+        const interval = setInterval(() => {
+            verifyWalletIntegrity();
+        }, 2 * 60 * 1000); // Every 2 minutes
+
+        return () => {
+            clearTimeout(timer);
+            clearInterval(interval);
+        };
+    }, [session, walletCredits, userProfile]);
 
 
-    return { walletCredits, setWalletCredits };
+
+    return { walletCredits, setWalletCredits, verifyWalletIntegrity };
 };

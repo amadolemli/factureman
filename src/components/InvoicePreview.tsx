@@ -79,7 +79,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
             <span>Fait le {maskDate(data.date)} {data.createdAt && !isDraft && <span className="text-gray-500 font-normal">à {new Date(data.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}</span>
             <div className="mt-2 space-y-1">
               <div>
-                {isReceipt ? "REÇU DE :" : "DOIT :"}
+                {isReceipt ? "REÇU DE :" : "CLIENT :"}
                 <span className="underline decoration-dotted ml-2 uppercase font-black block md:inline mt-1 md:mt-0">{isDraft ? "CLIENT MASQUÉ" : (data.customerName || "....................................")}</span>
               </div>
               {data.customerPhone && (

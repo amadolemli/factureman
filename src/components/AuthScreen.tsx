@@ -1,8 +1,206 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Loader2, Phone, ArrowRight, ShieldCheck, KeyRound, MessageSquare, Lock, RefreshCw, LogIn, UserPlus, User } from 'lucide-react';
+import { Loader2, Phone, ArrowRight, ShieldCheck, KeyRound, MessageSquare, Lock, RefreshCw, LogIn, UserPlus, User, Eye, EyeOff } from 'lucide-react';
+
 
 type AuthStep = 'HOME' | 'LOGIN_PHONE' | 'LOGIN_PASSWORD' | 'REGISTER_PHONE' | 'REGISTER_OTP' | 'REGISTER_PASSWORD' | 'RESET_PHONE' | 'RESET_OTP';
+
+// --- EXTRACTED COMPONENTS ---
+const PhoneInput = ({
+    onSubmit,
+    btnText,
+    onBack,
+    showReferral = false,
+    countryCode,
+    setCountryCode,
+    phone,
+    setPhone,
+    referralCode,
+    setReferralCode,
+    loading
+}: any) => (
+    <form onSubmit={onSubmit} className="space-y-4 animate-in slide-in-from-right">
+        <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 pl-2">Pays & Numéro de Téléphone</label>
+            <div className="flex gap-2">
+                <div className="relative w-1/3">
+                    <select
+                        className="w-full h-full pl-2 pr-1 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors text-xs appearance-none"
+                        value={countryCode}
+                        onChange={(e) => setCountryCode(e.target.value)}
+                    >
+                        <option value="+223">🇲🇱 +223</option>
+                        <option value="+229">🇧🇯 +229</option>
+                        <option value="+226">🇧🇫 +226</option>
+                        <option value="+225">🇨🇮 +225</option>
+                        <option value="+221">🇸🇳 +221</option>
+                        <option value="+227">🇳🇪 +227</option>
+                        <option value="+228">🇹🇬 +228</option>
+                        <option value="+224">🇬🇳 +224</option>
+                        <option value="+222">🇲🇷 +222</option>
+                        <option value="+233">🇬🇭 +233</option>
+                        <option value="+234">🇳🇬 +234</option>
+                        <option value="+220">🇬🇲 +220</option>
+                        <option value="+238">🇨🇻 +238</option>
+                        <option value="+245">🇬🇼 +245</option>
+                        <option value="+231">🇱🇷 +231</option>
+                        <option value="+232">🇸🇱 +232</option>
+                        <option value="+237">🇨🇲 +237</option>
+                        <option value="+236">🇨🇫 +236</option>
+                        <option value="+235">🇹🇩 +235</option>
+                        <option value="+242">🇨🇬 +242</option>
+                        <option value="+243">🇨🇩 +243</option>
+                        <option value="+240">🇬🇶 +240</option>
+                        <option value="+241">🇬🇦 +241</option>
+                        <option value="+239">🇸🇹 +239</option>
+                    </select>
+                </div>
+                <div className="relative w-2/3">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                    <input
+                        type="tel"
+                        required
+                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors"
+                        placeholder="70 00 00 00"
+                        value={phone}
+                        onChange={e => setPhone(e.target.value)}
+                        autoFocus
+                    />
+                </div>
+            </div>
+        </div>
+        {showReferral && (
+            <div className="space-y-1 animate-in fade-in slide-in-from-bottom-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 pl-2">Code Parrainage (Optionnel)</label>
+                <div className="relative">
+                    <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                    <input
+                        type="text"
+                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors uppercase placeholder:normal-case"
+                        placeholder="Entrez le code ici"
+                        value={referralCode}
+                        onChange={(e: any) => setReferralCode && setReferralCode(e.target.value.toUpperCase())}
+                    />
+                </div>
+            </div>
+        )}
+        <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-4 bg-blue-900 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-800 shadow-xl shadow-blue-200 flex items-center justify-center gap-2 mt-4"
+        >
+            {loading ? <Loader2 className="animate-spin" size={18} /> : btnText}
+            {!loading && <ArrowRight size={18} />}
+        </button>
+        {onBack && (
+            <button
+                type="button"
+                onClick={onBack}
+                className="w-full py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase"
+            >
+                Retour
+            </button>
+        )}
+    </form>
+);
+
+const OtpInput = ({ onSubmit, btnText, onBack, otp, setOtp, loading, formattedPhone }: any) => (
+    <form onSubmit={onSubmit} className="space-y-4 animate-in slide-in-from-right">
+        <div className="text-center mb-4">
+            <div className="inline-block p-3 bg-blue-50 rounded-full mb-3">
+                <MessageSquare className="text-blue-600" size={24} />
+            </div>
+            <h3 className="text-sm font-bold text-gray-800">Vérification SMS</h3>
+            <p className="text-xs text-gray-500 mt-1">Code envoyé au <span className="font-bold text-blue-900">{formattedPhone}</span></p>
+        </div>
+        <div className="relative">
+            <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+            <input
+                type="text"
+                required
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors tracking-[0.5em] text-center"
+                placeholder="000000"
+                maxLength={6}
+                value={otp}
+                onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                autoFocus
+            />
+        </div>
+        <button
+            type="submit"
+            disabled={loading || otp.length < 6}
+            className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-emerald-500 shadow-xl shadow-emerald-200 flex items-center justify-center gap-2"
+        >
+            {loading ? <Loader2 className="animate-spin" size={18} /> : btnText}
+        </button>
+        <button
+            type="button"
+            onClick={onBack}
+            className="w-full py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase"
+        >
+            Annuler
+        </button>
+    </form>
+);
+
+const PwdInput = ({ onSubmit, btnText, onBack, title, subTitle, password, setPassword, newPassword, setNewPassword, isNew, loading, onForgotPassword }: any) => {
+    const [showPassword, setShowPassword] = React.useState(true); // Default visible
+
+    return (
+        <form onSubmit={onSubmit} className="space-y-4 animate-in slide-in-from-right">
+            {title && (
+                <div className="text-center mb-4">
+                    <h3 className="text-sm font-bold text-gray-800">{title}</h3>
+                    {subTitle && <p className="text-xs text-gray-500 mt-1">{subTitle}</p>}
+                </div>
+            )}
+            <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    className="w-full pl-10 pr-12 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors"
+                    placeholder="Mot de passe confidentiel"
+                    value={isNew ? newPassword : password}
+                    onChange={e => isNew ? setNewPassword(e.target.value) : setPassword(e.target.value)}
+                    autoFocus
+                />
+                <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+            </div>
+            <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 bg-blue-900 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-800 shadow-xl shadow-blue-200 flex items-center justify-center gap-2"
+            >
+                {loading ? <Loader2 className="animate-spin" size={18} /> : btnText}
+            </button>
+            {/* Forget Password Link ONLY for Login Pwd Screen */}
+            {onForgotPassword && (
+                <button
+                    type="button"
+                    onClick={onForgotPassword}
+                    className="w-full py-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 uppercase"
+                >
+                    Mot de passe oublié ?
+                </button>
+            )}
+
+            <button
+                type="button"
+                onClick={onBack}
+                className="w-full py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase"
+            >
+                Retour
+            </button>
+        </form>
+    );
+};
 
 const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
     const [step, setStep] = useState<AuthStep>('HOME');
@@ -204,178 +402,7 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
 
     // --- RENDER HELPERS ---
 
-    const PhoneInput = ({ onSubmit, btnText, backStep, showReferral = false }: any) => (
-        <form onSubmit={onSubmit} className="space-y-4 animate-in slide-in-from-right">
-            <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 pl-2">Pays & Numéro de Téléphone</label>
-                <div className="flex gap-2">
-                    <div className="relative w-1/3">
-                        <select
-                            className="w-full h-full pl-2 pr-1 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors text-xs appearance-none"
-                            value={countryCode}
-                            onChange={(e) => setCountryCode(e.target.value)}
-                        >
-                            <option value="+223">🇲🇱 +223</option>
-                            <option value="+229">🇧🇯 +229</option>
-                            <option value="+226">🇧🇫 +226</option>
-                            <option value="+225">🇨🇮 +225</option>
-                            <option value="+221">🇸🇳 +221</option>
-                            <option value="+227">🇳🇪 +227</option>
-                            <option value="+228">🇹🇬 +228</option>
-                            <option value="+224">🇬🇳 +224</option>
-                            <option value="+222">🇲🇷 +222</option>
-                            <option value="+233">🇬🇭 +233</option>
-                            <option value="+234">🇳🇬 +234</option>
-                            <option value="+220">🇬🇲 +220</option>
-                            <option value="+238">🇨🇻 +238</option>
-                            <option value="+245">🇬🇼 +245</option>
-                            <option value="+231">🇱🇷 +231</option>
-                            <option value="+232">🇸🇱 +232</option>
-                            <option value="+237">🇨🇲 +237</option>
-                            <option value="+236">🇨🇫 +236</option>
-                            <option value="+235">🇹🇩 +235</option>
-                            <option value="+242">🇨🇬 +242</option>
-                            <option value="+243">🇨🇩 +243</option>
-                            <option value="+240">🇬🇶 +240</option>
-                            <option value="+241">🇬🇦 +241</option>
-                            <option value="+239">🇸🇹 +239</option>
-                        </select>
-                    </div>
-                    <div className="relative w-2/3">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                        <input
-                            type="tel"
-                            required
-                            className="w-full pl-10 pr-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors"
-                            placeholder="70 00 00 00"
-                            value={phone}
-                            onChange={e => setPhone(e.target.value)}
-                            autoFocus
-                        />
-                    </div>
-                </div>
-            </div>
-            {showReferral && (
-                <div className="space-y-1 animate-in fade-in slide-in-from-bottom-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 pl-2">Code Parrainage (Optionnel)</label>
-                    <div className="relative">
-                        <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                        <input
-                            type="text"
-                            className="w-full pl-10 pr-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors uppercase placeholder:normal-case"
-                            placeholder="Entrez le code ici"
-                            value={referralCode}
-                            onChange={(e: any) => setReferralCode(e.target.value.toUpperCase())}
-                        />
-                    </div>
-                </div>
-            )}
-            <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 bg-blue-900 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-800 shadow-xl shadow-blue-200 flex items-center justify-center gap-2 mt-4"
-            >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : btnText}
-                {!loading && <ArrowRight size={18} />}
-            </button>
-            {backStep && (
-                <button
-                    type="button"
-                    onClick={() => { setStep(backStep); setError(null); }}
-                    className="w-full py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase"
-                >
-                    Retour
-                </button>
-            )}
-        </form>
-    );
 
-    const OtpInput = ({ onSubmit, btnText, backStep }: any) => (
-        <form onSubmit={onSubmit} className="space-y-4 animate-in slide-in-from-right">
-            <div className="text-center mb-4">
-                <div className="inline-block p-3 bg-blue-50 rounded-full mb-3">
-                    <MessageSquare className="text-blue-600" size={24} />
-                </div>
-                <h3 className="text-sm font-bold text-gray-800">Vérification SMS</h3>
-                <p className="text-xs text-gray-500 mt-1">Code envoyé au <span className="font-bold text-blue-900">{getFormattedPhone()}</span></p>
-            </div>
-            <div className="relative">
-                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input
-                    type="text"
-                    required
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors tracking-[0.5em] text-center"
-                    placeholder="000000"
-                    maxLength={6}
-                    value={otp}
-                    onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                    autoFocus
-                />
-            </div>
-            <button
-                type="submit"
-                disabled={loading || otp.length < 6}
-                className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-emerald-500 shadow-xl shadow-emerald-200 flex items-center justify-center gap-2"
-            >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : btnText}
-            </button>
-            <button
-                type="button"
-                onClick={() => { setStep(backStep); setError(null); }}
-                className="w-full py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase"
-            >
-                Annuler
-            </button>
-        </form>
-    );
-
-    const PwdInput = ({ onSubmit, btnText, backStep, title, subTitle }: any) => (
-        <form onSubmit={onSubmit} className="space-y-4 animate-in slide-in-from-right">
-            {title && (
-                <div className="text-center mb-4">
-                    <h3 className="text-sm font-bold text-gray-800">{title}</h3>
-                    {subTitle && <p className="text-xs text-gray-500 mt-1">{subTitle}</p>}
-                </div>
-            )}
-            <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input
-                    type="password"
-                    required
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-900 outline-none focus:border-blue-500 transition-colors"
-                    placeholder="Mot de passe confidentiel"
-                    value={step.includes('NEW') ? newPassword : password}
-                    onChange={e => step.includes('NEW') ? setNewPassword(e.target.value) : setPassword(e.target.value)}
-                    autoFocus
-                />
-            </div>
-            <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 bg-blue-900 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-800 shadow-xl shadow-blue-200 flex items-center justify-center gap-2"
-            >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : btnText}
-            </button>
-            {/* Forget Password Link ONLY for Login Pwd Screen */}
-            {step === 'LOGIN_PASSWORD' && (
-                <button
-                    type="button"
-                    onClick={() => handleInitiateReset()}
-                    className="w-full py-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 uppercase"
-                >
-                    Mot de passe oublié ?
-                </button>
-            )}
-
-            <button
-                type="button"
-                onClick={() => { setStep(backStep); setError(null); }}
-                className="w-full py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase"
-            >
-                Retour
-            </button>
-        </form>
-    );
 
 
     return (
@@ -443,7 +470,12 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                         <PhoneInput
                             onSubmit={handleLoginPhoneSubmit}
                             btnText="Continuer vers le mot de passe"
-                            backStep="HOME"
+                            onBack={() => { setStep('HOME'); setError(null); }}
+                            countryCode={countryCode}
+                            setCountryCode={setCountryCode}
+                            phone={phone}
+                            setPhone={setPhone}
+                            loading={loading}
                         />
                     )}
 
@@ -451,9 +483,13 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                         <PwdInput
                             onSubmit={handleLoginPasswordSubmit}
                             btnText="Se Connecter"
-                            backStep="LOGIN_PHONE"
+                            onBack={() => { setStep('LOGIN_PHONE'); setError(null); }}
                             title="Connexion"
                             subTitle={`Compte : ${getFormattedPhone()}`}
+                            password={password}
+                            setPassword={setPassword}
+                            loading={loading}
+                            onForgotPassword={handleInitiateReset}
                         />
                     )}
 
@@ -462,8 +498,15 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                         <PhoneInput
                             onSubmit={handleRegisterPhoneSubmit}
                             btnText="Envoyer Code de Vérification"
-                            backStep="HOME"
+                            onBack={() => { setStep('HOME'); setError(null); }}
                             showReferral={true}
+                            countryCode={countryCode}
+                            setCountryCode={setCountryCode}
+                            phone={phone}
+                            setPhone={setPhone}
+                            referralCode={referralCode}
+                            setReferralCode={setReferralCode}
+                            loading={loading}
                         />
                     )}
 
@@ -471,7 +514,11 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                         <OtpInput
                             onSubmit={handleRegisterverifyOtp}
                             btnText="Vérifier le code"
-                            backStep="REGISTER_PHONE"
+                            onBack={() => { setStep('REGISTER_PHONE'); setError(null); }}
+                            otp={otp}
+                            setOtp={setOtp}
+                            loading={loading}
+                            formattedPhone={getFormattedPhone()}
                         />
                     )}
 
@@ -482,7 +529,12 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                         <PhoneInput
                             onSubmit={(e: React.FormEvent) => { e.preventDefault(); handleInitiateReset(); }}
                             btnText="Envoyer Code de Récupération"
-                            backStep="LOGIN_PASSWORD"
+                            onBack={() => { setStep('LOGIN_PASSWORD'); setError(null); }}
+                            countryCode={countryCode}
+                            setCountryCode={setCountryCode}
+                            phone={phone}
+                            setPhone={setPhone}
+                            loading={loading}
                         />
                     )}
 
@@ -490,7 +542,11 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                         <OtpInput
                             onSubmit={handleResetVerifyOtp}
                             btnText="Vérifier le code"
-                            backStep="RESET_PHONE"
+                            onBack={() => { setStep('RESET_PHONE'); setError(null); }}
+                            otp={otp}
+                            setOtp={setOtp}
+                            loading={loading}
+                            formattedPhone={getFormattedPhone()}
                         />
                     )}
 

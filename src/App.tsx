@@ -42,14 +42,21 @@ const App: React.FC = () => {
     }
     setStep(newStep);
     window.scrollTo(0, 0);
+    // Sync history so we stay on 'app' level but update content info
+    window.history.replaceState({ step: newStep, level: 'app' }, '');
   };
 
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showExitToast, setShowExitToast] = useState(false); // New State for Exit Toast
   const [showConvertMenu, setShowConvertMenu] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Ref to track current step for event listeners
+  const stepRef = useRef<AppStep>(AppStep.FORM);
+  useEffect(() => { stepRef.current = step; }, [step]);
 
   // AUTHENTICATION STATE
   const [session, setSession] = useState<Session | null>(null);
@@ -234,16 +241,44 @@ const App: React.FC = () => {
   //   }
   // };
 
+  // --- DOUBLE BACK TO EXIT LOGIC ---
+  const exitAttemptRef = useRef(false);
+
   useEffect(() => {
-    // Basic history management
-    window.history.replaceState({ step: AppStep.FORM }, '');
+    // 1. Establish History Guard on Mount
+    // We push a state so that the user is at index+1 (App Level). 
+    // Pressing back takes them to index (Root Level), which we intercept.
+    window.history.pushState({ step: AppStep.FORM, level: 'app' }, '');
 
     const handlePopState = (event: PopStateEvent) => {
-      if (event.state && event.state.step) {
-        setStep(event.state.step);
-      } else {
-        // Fallback to home if no state
-        setStep(AppStep.FORM);
+      // Check if we popped out of the app level
+      const state = event.state;
+      const isExitAttempt = !state || state.level !== 'app';
+
+      if (isExitAttempt) {
+        if (exitAttemptRef.current) {
+          // Double click confirmed -> Exit (Allow the pop to stand, which is effectively exit/back)
+          return;
+        } else {
+          // First click -> Trap
+          // Restore 'app' state immediately to prevent closing
+          window.history.pushState({ step: stepRef.current, level: 'app' }, '');
+
+          // Show Toast & Set Flag
+          setShowExitToast(true);
+          exitAttemptRef.current = true;
+
+          setTimeout(() => {
+            setShowExitToast(false);
+            exitAttemptRef.current = false;
+          }, 2000);
+          return;
+        }
+      }
+
+      // Handle normal history navigation if applicable
+      if (state && state.step) {
+        setStep(state.step);
       }
     };
 
@@ -605,10 +640,22 @@ const App: React.FC = () => {
         if (matchCount > 0) alert(`${matchCount} article(s) reconnu(s) dans le catalogue !`);
       }
 
-      // DEDUCT SCAN COST (Local Wallet)
-      // Server Deduction is disabled, so we deduct the full cost (40) locally.
+      // DEDUCT SCAN COST (Server Side - Online Feature)
       const PROCESSING_FEE = 40;
-      setWalletCredits(prev => prev - PROCESSING_FEE);
+
+      // Optimistic update of UI profile to reflect change immediately
+      setUserProfile(prev => prev ? ({ ...prev, app_credits: Math.max(0, prev.app_credits - PROCESSING_FEE) }) : null);
+
+      // Server update happens in background or via subsequent sync/refresh.
+      // Note: Formal deduction is ideally handled by the API call in useScanner if we were rigorous, 
+      // but here we do it via RPC for consistency with other actions if needed, OR we trust the Scanner Hook to have verified it.
+      // Actually, let's explicit call the deduction here to be safe and authoritative.
+      supabase.rpc('deduct_credits', { amount: PROCESSING_FEE }).then(({ data, error }) => {
+        if (error) {
+          console.error("Scan deduction failed", error);
+          alert("Erreur de débit. Veuillez vérifier votre solde.");
+        }
+      });
 
       setShowSuccessToast(true);
       setTimeout(() => setShowSuccessToast(false), 2000);
@@ -624,9 +671,14 @@ const App: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Check Local Wallet for Processing Fee
-    if (walletCredits < 10) {
-      alert("Solde Portefeuille insuffisant (> 10) pour traiter le résultat.\nVeuillez recharger ou synchroniser.");
+    // Check Server Balance for Processing Fee (Online Feature)
+    if (!navigator.onLine) {
+      alert("Le scan intelligent nécessite une connexion internet pou fonctionner.");
+      return;
+    }
+
+    if ((userProfile?.app_credits || 0) < 40) {
+      alert("Solde Serveur insuffisant (> 40) pour traiter le résultat.\nVeuillez recharger votre compte en ligne.");
       return;
     }
 
@@ -1648,6 +1700,13 @@ const App: React.FC = () => {
         accept="image/*,application/pdf"
         onChange={handleScan}
       />
+
+      {/* EXIT CONFIRMATION TOAST */}
+      {showExitToast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl z-[60] text-sm font-bold animate-in fade-in slide-in-from-bottom-4 pointer-events-none">
+          Appuyez encore pour quitter
+        </div>
+      )}
 
       {/* BOTTOM NAV (Masqué en mode Preview pour focus) */}
       {step !== AppStep.PREVIEW && (

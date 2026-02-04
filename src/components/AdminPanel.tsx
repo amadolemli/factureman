@@ -32,6 +32,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
     const [stats, setStats] = useState<any>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+    // Security: Max credit limit
+    const MAX_CREDIT_GRANT = 1000000;
+
     useEffect(() => {
         if (view === 'logs') fetchLogs();
     }, [view]);
@@ -77,7 +80,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
     };
 
     const handleGrantCredits = async () => {
-        if (!selectedUser || creditAmount <= 0) return;
+        // Security: Validate input
+        if (!selectedUser) {
+            setMessage({ type: 'error', text: 'Veuillez sélectionner un utilisateur' });
+            return;
+        }
+
+        if (creditAmount <= 0) {
+            setMessage({ type: 'error', text: 'Le montant doit être supérieur à 0' });
+            return;
+        }
+
+        if (creditAmount > MAX_CREDIT_GRANT) {
+            setMessage({ type: 'error', text: `Le montant ne peut pas dépasser ${MAX_CREDIT_GRANT.toLocaleString()} crédits` });
+            return;
+        }
+
         setProcessing(true);
         setMessage(null);
 
@@ -89,10 +107,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
 
             if (error) throw error;
 
-            setMessage({ type: 'success', text: `${creditAmount} crédits ajoutés à ${selectedUser.business_name || 'utilisateur'}` });
+            setMessage({ type: 'success', text: `${creditAmount.toLocaleString()} crédits ajoutés à ${selectedUser.business_name || 'utilisateur'}` });
             setCreditAmount(100);
             setSelectedUser(null);
             fetchUsers(); // Refresh list
+            fetchStats(); // Update dashboard stats
         } catch (err: any) {
             console.error(err);
             setMessage({ type: 'error', text: err.message || "Erreur lors de l'ajout des crédits." });
@@ -257,8 +276,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
                                         type="number"
                                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-mono"
                                         value={creditAmount}
-                                        onChange={e => setCreditAmount(parseInt(e.target.value) || 0)}
+                                        onChange={e => {
+                                            const val = parseInt(e.target.value) || 0;
+                                            setCreditAmount(Math.max(0, Math.min(val, MAX_CREDIT_GRANT)));
+                                        }}
+                                        min="1"
+                                        max={MAX_CREDIT_GRANT}
+                                        step="1"
                                     />
+                                    <div className="text-xs text-gray-400 mt-1">Max: {MAX_CREDIT_GRANT.toLocaleString()}</div>
                                 </div>
 
                                 <div className="flex items-end">
