@@ -10,6 +10,18 @@ export const generateInvoiceNumber = (): string => {
   return `F-${year}${random}`;
 };
 
+// Valid UUID v4 generator compatible with Supabase uuid columns
+export const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older browsers / insecure context
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export const numberToWords = (n: number): string => {
   if (n === 0) return "Zéro Franc CFA";
 
@@ -72,6 +84,6 @@ export const numberToWords = (n: number): string => {
 
   const final = result.trim();
   const capitalized = final.charAt(0).toUpperCase() + final.slice(1);
-  
+
   return `${capitalized} Francs CFA`;
 };

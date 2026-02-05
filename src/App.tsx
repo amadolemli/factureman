@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { InvoiceData, AppStep, DocumentType, Product, BusinessInfo, CreditRecord, Reminder, UserProfile, CreditHistoryItem } from './types';
 import { DEFAULT_BUSINESS, PRODUCT_CATALOG } from './constants';
-import { generateInvoiceNumber, formatCurrency } from './utils/format';
+import { generateInvoiceNumber, formatCurrency, generateUUID } from './utils/format';
 import InvoiceForm from './components/InvoiceForm';
 import InvoicePreview from './components/InvoicePreview';
 import StockManager from './components/StockManager';
@@ -579,7 +579,7 @@ const App: React.FC = () => {
 
   const handleQuickSaveProduct = (name: string, price: number) => {
     const newProd: Product = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: generateUUID(),
       name: name.toUpperCase(),
       defaultPrice: price,
       stock: 0,
@@ -601,7 +601,7 @@ const App: React.FC = () => {
     const parts = generateInvoiceNumber().split('-'); // FYYMMDD-RAND
     const newDoc: InvoiceData = {
       ...source,
-      id: Math.random().toString(36).substr(2, 9),
+      id: generateUUID(),
       type: newType,
       number: `${prefix}${parts[0].substring(1)}-${parts[1]}`, // Reconstruit le numéro avec le bon préfixe
       date: new Date().toISOString().split('T')[0], // Date d'aujourd'hui pour la conversion

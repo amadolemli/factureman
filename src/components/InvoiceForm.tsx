@@ -9,7 +9,8 @@ import {
     RotateCcw, AlertCircle, ChevronDown
 } from 'lucide-react';
 import ProductCatalog from './ProductCatalog';
-import { formatCurrency } from '../utils/format';
+import ProductCatalog from './ProductCatalog';
+import { formatCurrency, generateUUID } from '../utils/format';
 
 interface Props {
     data: InvoiceData;
@@ -348,7 +349,7 @@ const InvoiceForm: React.FC<Props> = ({ data, products, customerBalance = 0, exi
                             );
                         })}
                     </div>
-                    <button type="button" onClick={() => onChange({ ...data, items: [...data.items, { id: Math.random().toString(36).substr(2, 9), quantity: 1, description: '', unitPrice: 0 }] })} className="w-full py-2 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-black uppercase text-[9px]">+ Ajouter une ligne</button>
+                    <button type="button" onClick={() => onChange({ ...data, items: [...data.items, { id: generateUUID(), quantity: 1, description: '', unitPrice: 0 }] })} className="w-full py-2 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-black uppercase text-[9px]">+ Ajouter une ligne</button>
                 </section>
             )}
 
@@ -401,7 +402,7 @@ const InvoiceForm: React.FC<Props> = ({ data, products, customerBalance = 0, exi
                             newItems[emptyItemIdx] = { ...newItems[emptyItemIdx], description: product.name, unitPrice: product.defaultPrice };
                             onChange({ ...data, items: newItems });
                         } else {
-                            onChange({ ...data, items: [...data.items, { id: Math.random().toString(36).substr(2, 9), quantity: 1, description: product.name, unitPrice: product.defaultPrice }] });
+                            onChange({ ...data, items: [...data.items, { id: generateUUID(), quantity: 1, description: product.name, unitPrice: product.defaultPrice }] });
                         }
                     }}
                 />
