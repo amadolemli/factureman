@@ -80,7 +80,7 @@ const App: React.FC = () => {
       if (prev.some(n => n.title === notif.title && n.read === false)) return prev;
       return [{
         ...notif,
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateUUID(),
         date: new Date(),
         read: false
       }, ...prev];
@@ -994,7 +994,7 @@ const App: React.FC = () => {
       } else {
         // Safe fallback for new client (rare in this specific path)
         return [{
-          id: Math.random().toString(36).substr(2, 9),
+          id: generateUUID(),
           customerName: normalizedName,
           customerPhone: '',
           totalDebt: 0,
@@ -1031,13 +1031,13 @@ const App: React.FC = () => {
 
   const resetInvoice = (navigateToForm = true) => {
     setInvoiceData({
-      id: Math.random().toString(36).substr(2, 9),
+      id: generateUUID(),
       type: DocumentType.INVOICE,
       number: generateInvoiceNumber(),
       date: new Date().toISOString().split('T')[0],
       customerName: '',
       customerPhone: '',
-      items: [{ id: Math.random().toString(36).substr(2, 9), quantity: 1, description: '', unitPrice: 0 }],
+      items: [{ id: generateUUID(), quantity: 1, description: '', unitPrice: 0 }],
       business: businessInfo,
       templateId: templatePreference,
       amountPaid: 0,
@@ -1661,7 +1661,7 @@ const App: React.FC = () => {
                     remainingBalance: newBalance,
                     history: [{
                       type: isDebtIncrease ? 'INVOICE' : 'PAYMENT',
-                      id: Math.random().toString(36).substr(2, 9),
+                      id: generateUUID(),
                       date: new Date().toISOString(),
                       amount: Math.abs(diff),
                       description: reason // Reason already contains "Nouvelle Dette" or "Nouvel Avoir"
@@ -1670,14 +1670,14 @@ const App: React.FC = () => {
                 } else {
                   // Create new client record (Import/Archive)
                   updated.unshift({
-                    id: Math.random().toString(36).substr(2, 9),
+                    id: generateUUID(),
                     customerName: customerName,
                     customerPhone: '',
                     totalDebt: newBalance > 0 ? newBalance : 0,
                     remainingBalance: newBalance,
                     history: [{
                       type: newBalance > 0 ? 'INVOICE' : 'PAYMENT',
-                      id: Math.random().toString(36).substr(2, 9),
+                      id: generateUUID(),
                       date: new Date().toISOString(),
                       amount: Math.abs(newBalance),
                       description: `SOLDE INITIAL: ${reason}`
