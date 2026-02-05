@@ -58,15 +58,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
     return (
       <div id="invoice-preview-container" className="bg-white p-6 md:p-8 max-w-2xl mx-auto border-2 border-gray-800 shadow-xl relative min-h-[850px] flex flex-col print:shadow-none print:border-gray-800">
 
-        {/* QR Code Absolute Top Right (Classic) */}
-        {!isDraft && (
-          <div className="absolute top-6 right-6 opacity-80 print:opacity-100">
-            <div className="bg-white p-1 border border-gray-200">
-              <QRCode value={verifyUrl} size={64} />
-            </div>
-            <p className="text-[6px] text-center font-bold uppercase mt-0.5 tracking-wider">Scan pour vérifier</p>
-          </div>
-        )}
+
 
         {data.business.customHeaderImage ? (
           <div className="mb-6 rounded-xl overflow-hidden border border-gray-200">
@@ -220,8 +212,19 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           )}
         </div>
 
-        <div className="mt-8 grid grid-cols-2 gap-4 text-[10px] font-black uppercase">
+        <div className="mt-8 flex justify-between items-end text-[10px] font-black uppercase">
           <div className="text-center">Signature du Client<div className="h-16"></div>...................</div>
+
+          {/* QR Code Centered */}
+          {!isDraft && (
+            <div className="flex flex-col items-center opacity-80 mx-4">
+              <div className="bg-white p-1 border border-gray-200">
+                <QRCode value={verifyUrl} size={48} />
+              </div>
+              <p className="text-[6px] font-bold mt-1 tracking-wider text-gray-500">AUTHENTIQUE</p>
+            </div>
+          )}
+
           <div className="text-center text-blue-900">
             Le Gérant (La Boutique)
             {data.business.signatureUrl ? (
@@ -440,14 +443,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           </div>
         </div>
 
-        {/* QR Code Absolute Top Right (Modern) */}
-        {!isDraft && (
-          <div className="absolute top-4 right-4 z-20 print:opacity-100">
-            <div className="bg-white p-1 rounded-lg shadow-sm border border-gray-100">
-              <QRCode value={verifyUrl} size={56} />
-            </div>
-          </div>
-        )}
+
 
         {/* Section Client 'Carte' */}
         <div className="px-8 mt-8">
@@ -567,13 +563,21 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
               <p className="mb-8">Signature Client</p>
               <div className="w-24 h-6 border-b border-dashed border-slate-300"></div>
             </div>
-            <div className="text-right">
-              <p className="mb-8">Signature {data.business.name}</p>
-              {data.business.signatureUrl ? (
-                <div className="w-24 h-12 ml-auto flex justify-end"><img src={data.business.signatureUrl} alt="Signature" className="h-full object-contain" /></div>
-              ) : (
-                <div className="w-24 h-6 border-b border-dashed border-slate-300 ml-auto"></div>
+            <div className="text-right flex items-end gap-4">
+              {/* QR Code for Modern in footer */}
+              {!isDraft && (
+                <div className="hidden md:block opacity-60">
+                  <QRCode value={verifyUrl} size={42} />
+                </div>
               )}
+              <div>
+                <p className="mb-8">Signature {data.business.name}</p>
+                {data.business.signatureUrl ? (
+                  <div className="w-24 h-12 ml-auto flex justify-end"><img src={data.business.signatureUrl} alt="Signature" className="h-full object-contain" /></div>
+                ) : (
+                  <div className="w-24 h-6 border-b border-dashed border-slate-300 ml-auto"></div>
+                )}
+              </div>
             </div>
           </div>
           <div className={`text-center mt-6 text-[9px] font-bold ${theme.accent} opacity-80`}>
@@ -652,16 +656,6 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
             </div>
           </div>
         </div>
-
-        {/* QR Code Absolute Bottom Left Sidebar (Elegant) */}
-        {!isDraft && (
-          <div className="absolute bottom-4 left-4 z-20 print:opacity-100">
-            <div className="bg-white p-2 rounded-lg shadow-lg">
-              <QRCode value={verifyUrl} size={64} />
-            </div>
-            <p className="text-[6px] text-center font-bold uppercase mt-1 tracking-wider text-blue-900 bg-white/80 rounded px-1">Authentique</p>
-          </div>
-        )}
 
         {/* WATERMARK BROUILLON */}
         {isDraft && (
@@ -755,10 +749,36 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           </div>
         )}
 
-        {/* FOOTER */}
-        <div className="mt-auto px-4 md:px-12 pb-8 border-t border-gray-100 pt-6 text-center">
-          <div className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-medium opacity-60">
-            Généré par FactureMan
+        {/* FOOTER & SIGNATURES ELEGANT */}
+        <div className="mt-auto px-4 md:px-12 pb-8 pt-6">
+          <div className="flex justify-between items-end mb-8 text-xs font-serif italic text-gray-500">
+            <div>
+              <p className="mb-8">Pour accord,</p>
+              <div className="w-32 h-px bg-gray-300"></div>
+            </div>
+
+            <div className="text-right flex items-end gap-6">
+              {/* QR Code Elegant Footer */}
+              {!isDraft && (
+                <div className="opacity-70 mb-1">
+                  <QRCode value={verifyUrl} size={48} />
+                </div>
+              )}
+              <div>
+                <p className="mb-8">La Direction,</p>
+                {data.business.signatureUrl ? (
+                  <div className="w-32 h-16 ml-auto flex justify-end mb-[-10px]"><img src={data.business.signatureUrl} alt="Signature" className="h-full object-contain" /></div>
+                ) : (
+                  <div className="w-32 h-px bg-gray-300 ml-auto"></div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4 text-center">
+            <div className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-medium opacity-60">
+              Généré par FactureMan
+            </div>
           </div>
         </div>
       </div>
