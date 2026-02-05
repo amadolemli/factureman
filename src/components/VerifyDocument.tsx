@@ -38,14 +38,16 @@ export const VerifyDocument = () => {
                 throw new Error("Document introuvable ou accès refusé.");
             }
 
-            // Map flat RPC result to component structure
+            // Map flat RPC result with JSON snapshot to component structure
             const rpcData = data as any;
+            const biz = rpcData.business_snapshot || {};
+
             const mappedData = {
                 ...rpcData,
                 profiles: {
-                    business_name: rpcData.business_name,
-                    phone: rpcData.business_phone,
-                    address: rpcData.business_address
+                    business_name: biz.name || 'Entreprise Inconnue',
+                    phone: biz.phone,
+                    address: biz.address
                 }
             };
 

@@ -1,11 +1,10 @@
 -- ============================================================
--- ENABLE PUBLIC QR CODE VERIFICATION
+-- ENABLE PUBLIC QR CODE VERIFICATION (ROBUST VERSION)
 -- ============================================================
 
--- This function allows the "Verify Document" page to securely read
--- specific details of an invoice WITHOUT requiring login.
--- It bypasses Row Level Security (RLS) safely by only exposing
--- the fields needed for verification.
+-- This updated function relies ONLY on the 'invoices' table to avoid
+-- join errors if the profile is missing or linked incorrectly.
+-- It retrieves the business info directly from the invoice snapshot.
 
 CREATE OR REPLACE FUNCTION public.get_public_invoice_details(target_invoice_id uuid)
 RETURNS TABLE (
@@ -17,12 +16,10 @@ RETURNS TABLE (
     amount_paid numeric,
     is_finalized boolean,
     customer_name text,
-    business_name text,
-    business_phone text,
-    business_address text
+    business_snapshot jsonb
 )
 LANGUAGE plpgsql
-SECURITY DEFINER -- Runs with Super User privileges to bypass RLS
+SECURITY DEFINER
 AS $$
 BEGIN
     RETURN QUERY
@@ -33,13 +30,10 @@ BEGIN
         i.date,
         i.total_amount,
         i.amount_paid,
-        i.status = 'PAID' OR i.status = 'CONFIRMED' as is_finalized, -- Derive finalized status
+        (i.status = 'PAID' OR i.status = 'CONFIRMED') as is_finalized,
         i.customer_name,
-        p.business_name,
-        p.phone as business_phone,
-        (p.business_info->>'address')::text as business_address
+        (i.content->'business') as business_snapshot
     FROM public.invoices i
-    JOIN public.profiles p ON i.user_id = p.id
     WHERE i.id = target_invoice_id;
 END;
 $$;
