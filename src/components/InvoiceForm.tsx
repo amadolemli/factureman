@@ -9,7 +9,6 @@ import {
     RotateCcw, AlertCircle, ChevronDown
 } from 'lucide-react';
 import ProductCatalog from './ProductCatalog';
-import ProductCatalog from './ProductCatalog';
 import { formatCurrency, generateUUID } from '../utils/format';
 
 interface Props {
