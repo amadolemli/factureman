@@ -1496,7 +1496,7 @@ const App: React.FC = () => {
                     <Download size={16} /> <span className="hidden sm:inline">Installer</span>
                   </button>
                 )}
-                {(step === AppStep.FORM || step === AppStep.HISTORY || step === AppStep.STOCK || step === AppStep.CREDIT) && (
+                {step === AppStep.FORM && (
                   <button onClick={() => goToStep(AppStep.PREVIEW)} className="bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-xl font-bold flex items-center gap-2 text-[10px] uppercase transition-all active:scale-95 shadow-lg border border-blue-500"><Eye size={16} /> Aperçu</button>
                 )}
               </>

@@ -8,12 +8,22 @@ export const dataSyncService = {
         if (!userId) return null;
 
         try {
-            const [productsRes, invoicesRes, clientsRes, profileRes] = await Promise.all([
+            // 1. Fetch Profile First (Needed for fallbacks)
+            const { data: profileData, error: profileError } = await supabase.from('profiles').select('*').eq('id', userId).single();
+            if (profileError) console.warn('Profile fetch warning:', profileError);
+
+            const businessFallback = profileData?.business_info || { name: 'VOTRE ENTREPRISE', specialty: '', address: '', phone: '', city: '' };
+
+            // 2. Fetch Lists in Parallel (Settled = don't fail all if one fails)
+            const results = await Promise.allSettled([
                 supabase.from('products').select('*').eq('user_id', userId),
-                supabase.from('invoices').select('*').eq('user_id', userId),
-                supabase.from('clients').select('*').eq('user_id', userId),
-                supabase.from('profiles').select('*').eq('id', userId).single()
+                supabase.from('invoices').select('*').eq('user_id', userId), // Order might matter if relying heavily on sorting, but usually ok
+                supabase.from('clients').select('*').eq('user_id', userId)
             ]);
+
+            const productsRes = results[0].status === 'fulfilled' ? results[0].value : { data: [], error: results[0].reason };
+            const invoicesRes = results[1].status === 'fulfilled' ? results[1].value : { data: [], error: results[1].reason };
+            const clientsRes = results[2].status === 'fulfilled' ? results[2].value : { data: [], error: results[2].reason };
 
             if (productsRes.error) console.error('Error fetching products:', productsRes.error);
             if (invoicesRes.error) console.error('Error fetching invoices:', invoicesRes.error);
@@ -31,20 +41,33 @@ export const dataSyncService = {
             }));
 
             // Invoices
-            const history: InvoiceData[] = (invoicesRes.data || []).map(inv => ({
-                id: inv.id,
-                type: inv.type as any,
-                number: inv.number,
-                date: inv.date,
-                customerName: inv.customer_name,
-                customerPhone: inv.customer_phone,
-                business: { name: '', specialty: '', address: '', phone: '', city: '' }, // Placeholder, will rely on profile or snapshot if stored
-                items: inv.content?.items || [],
-                templateId: inv.content?.templateId || 'classic',
-                amountPaid: inv.amount_paid,
-                isFinalized: true, // History items are always finalized
-                creditConfirmed: inv.status === 'CONFIRMED'
-            }));
+            const history: InvoiceData[] = (invoicesRes.data || []).map(inv => {
+                const content = inv.content || {}; // Safety check
+
+                // HYBRID RECOVERY STRATEGY:
+                // 1. Try to get Business Snapshot from 'content' (New Data)
+                // 2. If missing, use current User Profile Business Info (Legacy Data Fallback)
+                const businessInfo = (content.business && content.business.name)
+                    ? content.business
+                    : businessFallback;
+
+                return {
+                    id: inv.id,
+                    type: inv.type as any,
+                    number: inv.number,
+                    date: inv.date,
+                    customerName: inv.customer_name,
+                    customerPhone: inv.customer_phone,
+                    business: businessInfo,
+                    items: content.items || [], // Items were always saved in content
+                    templateId: content.templateId || 'classic',
+                    amountPaid: inv.amount_paid,
+                    isFinalized: true,
+                    creditConfirmed: inv.status === 'CONFIRMED',
+                    clientBalanceSnapshot: content.clientBalanceSnapshot,
+                    createdAt: content.createdAt || inv.created_at // Fallback to DB timestamp if avail
+                };
+            });
 
             // Credits (Clients)
             const credits: CreditRecord[] = (clientsRes.data || []).map(c => ({
@@ -52,20 +75,18 @@ export const dataSyncService = {
                 customerName: c.name,
                 customerPhone: c.phone || '',
                 totalDebt: c.total_debt,
-                remainingBalance: c.total_debt, // Simplified for now
-                history: c.history || []
+                remainingBalance: c.remaining_balance ?? c.total_debt,
+                history: c.history || [],
+                appointments: c.appointments || []
             }));
 
-            // Business Info
-            let businessInfo: BusinessInfo | null = null;
-            if (profileRes.data && profileRes.data.business_info) {
-                businessInfo = profileRes.data.business_info;
-            }
-
-            return { products, history, credits, businessInfo };
+            return { products, history, credits, businessInfo: profileData?.business_info || null };
 
         } catch (error) {
-            console.error("Sync Error:", error);
+            console.error("Sync Critical Failure:", error);
+            // Even if critical fail, return empty structure to avoid app crash, 
+            // but maybe return null to indicate 'Sync Failed' to UI?
+            // Returning null allows the caller to know it failed.
             return null;
         }
     },
@@ -101,7 +122,7 @@ export const dataSyncService = {
             total_amount: inv.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
             amount_paid: inv.amountPaid,
             status: inv.creditConfirmed ? 'CONFIRMED' : 'PENDING',
-            content: { items: inv.items, templateId: inv.templateId }
+            content: inv // SAVE FULL OBJECT to preserve snapshots (business, balance, etc)
         }));
         const { error } = await supabase.from('invoices').upsert(dbInvoices);
         if (error) console.error('Error saving invoices:', error);
@@ -115,7 +136,9 @@ export const dataSyncService = {
             name: c.customerName,
             phone: c.customerPhone,
             total_debt: c.totalDebt,
-            history: c.history
+            remaining_balance: c.remainingBalance,
+            history: c.history,
+            appointments: c.appointments
         }));
         const { error } = await supabase.from('clients').upsert(dbClients);
         if (error) console.error('Error saving clients:', error);

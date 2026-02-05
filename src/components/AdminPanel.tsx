@@ -320,20 +320,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
                                                 </div>
                                                 <div>
                                                     <div className="font-bold text-gray-900 flex items-center gap-2">
-                                                        {(user.business_name && user.business_name !== 'Ma Nouvelle Boutique' && user.business_name !== 'Utilisateur Sans Nom')
+                                                        {(user.business_name && user.business_name.trim() !== '' && user.business_name !== 'Ma Nouvelle Boutique')
                                                             ? user.business_name
-                                                            : (user.phone || user.business_name || 'Inconnu')}
+                                                            : (user.phone || `Utilisateur ${user.id.substring(0, 6)}`)}
 
-                                                        <span className="text-[10px] text-gray-500 font-normal">
-                                                            {/* If we showed phone as title, don't show it here redundancy, unless we want to show it's a phone */}
-                                                            {(user.business_name && user.business_name !== 'Ma Nouvelle Boutique' && user.business_name !== 'Utilisateur Sans Nom') && user.phone ? `(${user.phone.slice(-4)})` : ''}
-                                                        </span>
                                                         {user.is_super_admin && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1"><Star size={8} fill="currentColor" /> SUPER ADMIN</span>}
                                                         {!user.is_super_admin && user.is_admin && <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">ADMIN</span>}
                                                         {user.is_banned && <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full">BLOQUÉ</span>}
                                                     </div>
-                                                    <div className="text-xs text-gray-400 font-mono">
-                                                        {(user.business_name && user.business_name !== 'Ma Nouvelle Boutique' && user.business_name !== 'Utilisateur Sans Nom') ? (user.phone || user.id) : user.id}
+                                                    <div className="text-xs text-gray-500 font-mono flex items-center gap-2">
+                                                        {(user.business_name && user.phone) ? (
+                                                            <span className="font-bold text-blue-600 bg-blue-50 px-1 rounded">{user.phone}</span>
+                                                        ) : (
+                                                            <span>ID: {user.id}</span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

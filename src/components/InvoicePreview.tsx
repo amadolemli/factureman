@@ -160,7 +160,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
                 </tr>
               ))}
               {Array.from({ length: 6 - data.items.length }).map((_, i) => (
-                <tr key={i} className="h-6 border-b border-gray-50 opacity-10">
+                <tr key={i} className="h-6 border-b border-gray-50">
                   <td className="border-r-2 border-gray-800"></td><td className={`${!isPriceHidden ? 'border-r-2' : ''} border-gray-800`}></td>
                   {!isPriceHidden && <><td className="border-r-2 border-gray-800"></td><td></td></>}
                 </tr>
@@ -430,7 +430,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
             </div>
 
             <div className="text-right">
-              <div className={`inline-block px-4 py-1.5 rounded-full ${theme.bgAccent} text-white mb-2 shadow-lg shadow-${colorKey}-900/50`}>
+              <div className={`inline-block px-4 py-1.5 rounded-full ${theme.bgAccent} text-white mb-2 shadow-md relative z-20`}>
                 <h2 className="text-lg font-bold uppercase tracking-wide">{data.type}</h2>
               </div>
               <div className="text-slate-300 space-y-1 mt-2">
@@ -559,25 +559,26 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
         {/* Pied de page */}
         <div className="p-8 mt-auto">
           <div className="border-t border-slate-100 pt-6 flex justify-between items-end text-[10px] text-slate-400 font-medium uppercase">
-            <div>
+            <div className="w-1/3">
               <p className="mb-8">Signature Client</p>
               <div className="w-24 h-6 border-b border-dashed border-slate-300"></div>
             </div>
-            <div className="text-right flex items-end gap-4">
-              {/* QR Code for Modern in footer */}
+
+            <div className="w-1/3 flex justify-center pb-2">
               {!isDraft && (
                 <div className="hidden md:block opacity-60">
                   <QRCode value={verifyUrl} size={42} />
                 </div>
               )}
-              <div>
-                <p className="mb-8">Signature {data.business.name}</p>
-                {data.business.signatureUrl ? (
-                  <div className="w-24 h-12 ml-auto flex justify-end"><img src={data.business.signatureUrl} alt="Signature" className="h-full object-contain" /></div>
-                ) : (
-                  <div className="w-24 h-6 border-b border-dashed border-slate-300 ml-auto"></div>
-                )}
-              </div>
+            </div>
+
+            <div className="w-1/3 text-right">
+              <p className="mb-8">Signature {data.business.name}</p>
+              {data.business.signatureUrl ? (
+                <div className="w-24 h-12 ml-auto flex justify-end"><img src={data.business.signatureUrl} alt="Signature" className="h-full object-contain" /></div>
+              ) : (
+                <div className="w-24 h-6 border-b border-dashed border-slate-300 ml-auto"></div>
+              )}
             </div>
           </div>
           <div className={`text-center mt-6 text-[9px] font-bold ${theme.accent} opacity-80`}>
@@ -752,26 +753,26 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
         {/* FOOTER & SIGNATURES ELEGANT */}
         <div className="mt-auto px-4 md:px-12 pb-8 pt-6">
           <div className="flex justify-between items-end mb-8 text-xs font-serif italic text-gray-500">
-            <div>
+            <div className="w-1/3">
               <p className="mb-8">Pour accord,</p>
               <div className="w-32 h-px bg-gray-300"></div>
             </div>
 
-            <div className="text-right flex items-end gap-6">
-              {/* QR Code Elegant Footer */}
+            <div className="w-1/3 flex justify-center pb-2">
               {!isDraft && (
                 <div className="opacity-70 mb-1">
                   <QRCode value={verifyUrl} size={48} />
                 </div>
               )}
-              <div>
-                <p className="mb-8">La Direction,</p>
-                {data.business.signatureUrl ? (
-                  <div className="w-32 h-16 ml-auto flex justify-end mb-[-10px]"><img src={data.business.signatureUrl} alt="Signature" className="h-full object-contain" /></div>
-                ) : (
-                  <div className="w-32 h-px bg-gray-300 ml-auto"></div>
-                )}
-              </div>
+            </div>
+
+            <div className="w-1/3 text-right">
+              <p className="mb-8">La Direction,</p>
+              {data.business.signatureUrl ? (
+                <div className="w-32 h-16 ml-auto flex justify-end mb-[-10px]"><img src={data.business.signatureUrl} alt="Signature" className="h-full object-contain" /></div>
+              ) : (
+                <div className="w-32 h-px bg-gray-300 ml-auto"></div>
+              )}
             </div>
           </div>
 
