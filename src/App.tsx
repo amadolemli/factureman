@@ -31,8 +31,14 @@ import { useOfflineActivity } from './hooks/useOfflineActivity';
 import OnboardingTour from './components/OnboardingTour';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import NotificationCenter, { AppNotification } from './components/NotificationCenter';
+import { VerifyDocument } from './components/VerifyDocument';
 
 const App: React.FC = () => {
+  // ROUTING HACK: Simple manual routing for Verification Page
+  if (window.location.pathname.startsWith('/verify')) {
+    return <VerifyDocument />;
+  }
+
   const [step, setStep] = useState<AppStep>(AppStep.FORM);
   const [previousStep, setPreviousStep] = useState<AppStep>(AppStep.FORM);
 
@@ -1413,23 +1419,23 @@ const App: React.FC = () => {
                 <ArrowLeft size={18} /> Fermer
               </button>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 w-full overflow-hidden">
                 {step !== AppStep.FORM && (
                   <button
                     onClick={() => setStep(previousStep)}
-                    className="bg-white/10 p-2 rounded-xl active:scale-90 hover:bg-white/20 transition-all text-white border border-white/20"
+                    className="bg-white/10 p-2 rounded-xl active:scale-90 hover:bg-white/20 transition-all text-white border border-white/20 shrink-0"
                     title="Retour"
                   >
                     <ArrowLeft size={18} />
                   </button>
                 )}
-                <div className="bg-white/10 p-2 rounded-xl"><FileText className="text-blue-300" size={20} /></div>
-                <div>
-                  <h1 className="text-lg font-black italic leading-none">FactureMan</h1>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[9px] text-blue-300 font-bold uppercase mt-1 tracking-wider">{getHeaderTitle()}</p>
+                <div className="bg-white/10 p-2 rounded-xl shrink-0"><FileText className="text-blue-300" size={20} /></div>
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-lg font-black italic leading-none truncate">FactureMan</h1>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-[9px] text-blue-300 font-bold uppercase mt-1 tracking-wider truncate">{getHeaderTitle()}</p>
                     {userProfile && (
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${(userProfile.app_credits + walletCredits) > 200 ? 'bg-blue-800 text-blue-200 border-blue-700' : 'bg-red-900 text-red-200 border-red-700 animate-pulse'}`}>
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border whitespace-nowrap ${(userProfile.app_credits + walletCredits) > 200 ? 'bg-blue-800 text-blue-200 border-blue-700' : 'bg-red-900 text-red-200 border-red-700 animate-pulse'}`}>
                         {(userProfile.app_credits + walletCredits)} CRÉDITS
                       </span>
                     )}
@@ -1595,6 +1601,38 @@ const App: React.FC = () => {
               await supabase.auth.signOut();
               setSession(null);
               setUserProfile(null);
+            }}
+            onSync={async () => {
+              if (!session?.user?.id) return;
+              setSyncStatus('syncing');
+
+              try {
+                const cloudData = await dataSyncService.fetchUserData(session.user.id);
+                if (cloudData) {
+                  const mergeArrays = <T extends { id: string }>(local: T[], cloud: T[]): T[] => {
+                    const map = new Map<string, T>();
+                    cloud.forEach(item => map.set(item.id, item));
+                    local.forEach(item => map.set(item.id, item)); // Retain local edits if conflict? actually for restore we might want cloud first if local is cleared? 
+                    // Wait, if local is empty because user cleared data, map will just be cloud data. Correct.
+                    return Array.from(map.values());
+                  };
+
+                  setProducts(prev => mergeArrays(prev, cloudData.products));
+                  setHistory(prev => mergeArrays(prev, cloudData.history));
+                  setCredits(prev => mergeArrays(prev, cloudData.credits));
+                  if (cloudData.businessInfo) setBusinessInfo(cloudData.businessInfo);
+
+                  setSyncStatus('success');
+                  setShowSuccessToast(true);
+                  setTimeout(() => setSyncStatus('idle'), 3000);
+                  setTimeout(() => setShowSuccessToast(false), 3000);
+                } else {
+                  setSyncStatus('error');
+                }
+              } catch (e) {
+                console.error(e);
+                setSyncStatus('error');
+              }
             }}
           />
         )}

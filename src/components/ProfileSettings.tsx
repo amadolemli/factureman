@@ -1,8 +1,9 @@
 import React, { useRef, useState, useMemo } from 'react';
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
+import SignatureCanvas from 'react-signature-canvas';
 import 'react-image-crop/dist/ReactCrop.css';
 import { BusinessInfo, InvoiceData, CreditRecord } from '../types';
-import { Settings, Image as ImageIcon, Palette, Store, MapPin, Phone, Briefcase, User, Search, MessageCircle, Contact2, Shield, Download, Upload, FileText, X, Info, Activity, Edit2, Save, UserPlus, Check, Share2 } from 'lucide-react';
+import { Settings, Image as ImageIcon, Palette, Store, MapPin, Phone, Briefcase, User, Search, MessageCircle, Contact2, Shield, Download, Upload, FileText, X, Info, Activity, Edit2, Save, UserPlus, Check, Share2, PenTool, Eraser } from 'lucide-react';
 import { testGeminiConnection } from '../services/geminiService';
 import { testMistralConnection } from '../services/mistralService';
 import AdminPanel from './AdminPanel';
@@ -21,9 +22,10 @@ interface Props {
   creditsCount?: number;
   userProfile: UserProfile | null;
   onLogout: () => void;
+  onSync: () => void;
 }
 
-const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credits, onUpdateBusiness, onUpdateTemplate, onPreviewDoc, onUpdateClient, onAddClient, creditsCount, userProfile, onLogout }) => {
+const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credits, onUpdateBusiness, onUpdateTemplate, onPreviewDoc, onUpdateClient, onAddClient, creditsCount, userProfile, onLogout, onSync }) => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState<{ name: string; phone: string } | null>(null);
@@ -33,6 +35,27 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+
+  // Signature State
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const sigCanvasRef = useRef<SignatureCanvas | null>(null);
+
+  const saveSignature = () => {
+    if (sigCanvasRef.current) {
+      if (sigCanvasRef.current.isEmpty()) {
+        alert("Veuillez signer avant de sauvegarder.");
+        return;
+      }
+      // Save as PNG data URL
+      const signatureDataUrl = sigCanvasRef.current.getTrimmedCanvas().toDataURL('image/png');
+      onUpdateBusiness({ ...business, signatureUrl: signatureDataUrl });
+      setShowSignatureModal(false);
+    }
+  };
+
+  const clearSignature = () => {
+    sigCanvasRef.current?.clear();
+  };
 
 
   // Cropping State
@@ -365,6 +388,98 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
 
 
         </div>
+
+        {/* SIGNATURE DIGITALE SECTION */}
+        <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-black text-gray-800 uppercase flex items-center gap-2">
+              <PenTool size={16} className="text-blue-600" /> Signature Digitale
+            </h3>
+            {business.signatureUrl && (
+              <button
+                onClick={() => {
+                  if (confirm("Supprimer votre signature ?")) {
+                    onUpdateBusiness({ ...business, signatureUrl: undefined });
+                  }
+                }}
+                className="text-xs font-bold text-red-500 hover:text-red-700"
+              >
+                Supprimer
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col items-center gap-4">
+            {business.signatureUrl ? (
+              <div className="relative group w-full max-w-xs p-4 border-2 border-dashed border-gray-300 rounded-xl bg-white">
+                <img src={business.signatureUrl} alt="Signature" className="w-full h-24 object-contain" />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                  <button
+                    onClick={() => setShowSignatureModal(true)}
+                    className="bg-white text-black px-4 py-2 rounded-lg text-xs font-bold uppercase"
+                  >
+                    Modifier
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 px-8 border-2 border-dashed border-gray-300 rounded-xl w-full">
+                <p className="text-xs text-gray-400 mb-3">Aucune signature enregistrée</p>
+                <button
+                  onClick={() => setShowSignatureModal(true)}
+                  className="bg-blue-600 text-white px-4 py-3 rounded-xl font-bold text-xs uppercase shadow-lg shadow-blue-200 active:scale-95 transition-all"
+                >
+                  Créer ma signature
+                </button>
+              </div>
+            )}
+            <p className="text-[10px] text-gray-400 text-center max-w-sm">
+              Cette signature sera apposée automatiquement au bas de vos factures et reçus pour les authentifier visuellement.
+            </p>
+          </div>
+        </div>
+
+        {/* Modal Signature */}
+        {showSignatureModal && (
+          <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+              <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="text-sm font-black uppercase text-gray-800">Dessinez votre signature</h3>
+                <button onClick={() => setShowSignatureModal(false)}><X size={20} className="text-gray-400" /></button>
+              </div>
+
+              <div className="p-4 bg-gray-100 flex justify-center">
+                <div className="border-2 border-gray-300 bg-white rounded-xl overflow-hidden shadow-inner">
+                  <SignatureCanvas
+                    ref={sigCanvasRef}
+                    penColor="black"
+                    canvasProps={{
+                      width: 320,
+                      height: 160,
+                      className: 'signature-canvas cursor-crosshair'
+                    }}
+                    backgroundColor="rgba(255,255,255,1)"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 flex gap-3 justify-center bg-white border-t border-gray-100">
+                <button
+                  onClick={clearSignature}
+                  className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200"
+                >
+                  <Eraser size={14} /> Effacer
+                </button>
+                <button
+                  onClick={saveSignature}
+                  className="flex items-center gap-2 px-6 py-2 text-xs font-black text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200"
+                >
+                  <Check size={14} /> Valider
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Template Selector */}
         <div>
@@ -788,6 +903,13 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
           className="w-full p-4 bg-red-50 text-red-700 rounded-xl border border-red-100 flex items-center justify-center gap-2 hover:bg-red-100 transition-colors font-black uppercase text-xs"
         >
           <User size={18} /> Se déconnecter
+        </button>
+
+        <button
+          onClick={onSync}
+          className="w-full mt-3 p-4 bg-blue-50 text-blue-700 rounded-xl border border-blue-100 flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors font-black uppercase text-xs"
+        >
+          <Activity size={18} /> Resynchroniser Données
         </button>
 
         <button

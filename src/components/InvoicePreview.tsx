@@ -1,5 +1,6 @@
 
 import React from 'react';
+import QRCode from 'react-qr-code';
 import { InvoiceData, DocumentType } from '../types';
 import { formatCurrency, numberToWords } from '../utils/format';
 
@@ -48,10 +49,25 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
   const maskText = (text: string) => isDraft ? "• • • • •" : text;
   const maskDate = (date: string) => isDraft ? "••/••/••••" : new Date(date).toLocaleDateString('fr-FR');
 
+  // QR Code Data (Public Safe Data)
+  // We use the ID to let the user fetch status from the server.
+  const verifyUrl = `${window.location.protocol}//${window.location.host}/verify/${data.id}`;
+
   // --- TEMPLATE: CLASSIC ---
   if (data.templateId === 'classic') {
     return (
       <div id="invoice-preview-container" className="bg-white p-6 md:p-8 max-w-2xl mx-auto border-2 border-gray-800 shadow-xl relative min-h-[850px] flex flex-col print:shadow-none print:border-gray-800">
+
+        {/* QR Code Absolute Top Right (Classic) */}
+        {!isDraft && (
+          <div className="absolute top-6 right-6 opacity-80 print:opacity-100">
+            <div className="bg-white p-1 border border-gray-200">
+              <QRCode value={verifyUrl} size={64} />
+            </div>
+            <p className="text-[6px] text-center font-bold uppercase mt-0.5 tracking-wider">Scan pour vérifier</p>
+          </div>
+        )}
+
         {data.business.customHeaderImage ? (
           <div className="mb-6 rounded-xl overflow-hidden border border-gray-200">
             <img src={data.business.customHeaderImage} alt="En-tête" className="w-full object-contain max-h-40" />
@@ -111,6 +127,15 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           <div className="absolute inset-0 flex items-center justify-center p-10 pointer-events-none opacity-20 overflow-hidden z-0">
             <p className="text-9xl font-black text-red-500 -rotate-45 whitespace-nowrap select-none border-8 border-red-500 p-10 rounded-[3rem]">
               IMPAYÉ
+            </p>
+          </div>
+        )}
+
+        {/* WATERMARK PAYÉ (Fully Paid) */}
+        {!isDraft && data.type === DocumentType.INVOICE && amountPaid >= subtotal && subtotal > 0 && (
+          <div className="absolute inset-0 flex items-center justify-center p-10 pointer-events-none opacity-20 overflow-hidden z-0">
+            <p className="text-9xl font-black text-green-600 -rotate-45 whitespace-nowrap select-none border-8 border-green-600 p-10 rounded-[3rem] animate-in zoom-in-50 duration-500">
+              PAYÉ
             </p>
           </div>
         )}
@@ -197,7 +222,14 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
 
         <div className="mt-8 grid grid-cols-2 gap-4 text-[10px] font-black uppercase">
           <div className="text-center">Signature du Client<div className="h-16"></div>...................</div>
-          <div className="text-center text-blue-900">Le Gérant (La Boutique)<div className="h-16"></div>Cachet & Signature</div>
+          <div className="text-center text-blue-900">
+            Le Gérant (La Boutique)
+            {data.business.signatureUrl ? (
+              <div className="h-16 flex items-center justify-center my-1"><img src={data.business.signatureUrl} alt="Signature" className="h-full object-contain" /></div>
+            ) : (
+              <div className="h-16 flex items-center justify-center text-[8px] text-gray-300 italic">Cachet & Signature</div>
+            )}
+          </div>
         </div>
         <div className="mt-8 pt-4 border-t border-gray-200 text-center text-[10px] text-gray-400 font-medium opacity-70">
           Généré par FactureMan — Gérez tout. Simplement
@@ -314,7 +346,12 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
                 Signature Client
               </div>
               <div className="text-center border-t border-slate-100 pt-4">
-                Cachet & Signature
+                Signature {data.business.name}
+                {data.business.signatureUrl ? (
+                  <div className="mt-2 flex justify-center"><img src={data.business.signatureUrl} alt="Signature" className="h-12 object-contain" /></div>
+                ) : (
+                  <div className="mt-2 text-slate-300 text-[8px] font-normal italic lowercase">Non signé</div>
+                )}
               </div>
             </div>
 
@@ -402,6 +439,15 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
             </div>
           </div>
         </div>
+
+        {/* QR Code Absolute Top Right (Modern) */}
+        {!isDraft && (
+          <div className="absolute top-4 right-4 z-20 print:opacity-100">
+            <div className="bg-white p-1 rounded-lg shadow-sm border border-gray-100">
+              <QRCode value={verifyUrl} size={56} />
+            </div>
+          </div>
+        )}
 
         {/* Section Client 'Carte' */}
         <div className="px-8 mt-8">
@@ -496,6 +542,15 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
             </div>
           )}
 
+          {/* WATERMARK PAYÉ (Fully Paid) */}
+          {!isDraft && data.type === DocumentType.INVOICE && amountPaid >= subtotal && subtotal > 0 && (
+            <div className="absolute inset-0 flex items-center justify-center p-10 pointer-events-none opacity-20 overflow-hidden z-0">
+              <p className="text-9xl font-black text-green-600 -rotate-45 whitespace-nowrap select-none border-8 border-green-600 p-10 rounded-[3rem] animate-in zoom-in-50 duration-500">
+                PAYÉ
+              </p>
+            </div>
+          )}
+
 
           {showClientBalance && (
             <div className={`mt-8 p-4 rounded-xl border ${balanceToShow < 0 ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-red-50 border-red-100 text-red-800'} flex justify-between items-center`}>
@@ -514,7 +569,11 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
             </div>
             <div className="text-right">
               <p className="mb-8">Signature {data.business.name}</p>
-              <div className="w-24 h-6 border-b border-dashed border-slate-300 ml-auto"></div>
+              {data.business.signatureUrl ? (
+                <div className="w-24 h-12 ml-auto flex justify-end"><img src={data.business.signatureUrl} alt="Signature" className="h-full object-contain" /></div>
+              ) : (
+                <div className="w-24 h-6 border-b border-dashed border-slate-300 ml-auto"></div>
+              )}
             </div>
           </div>
           <div className={`text-center mt-6 text-[9px] font-bold ${theme.accent} opacity-80`}>
@@ -594,6 +653,16 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           </div>
         </div>
 
+        {/* QR Code Absolute Bottom Left Sidebar (Elegant) */}
+        {!isDraft && (
+          <div className="absolute bottom-4 left-4 z-20 print:opacity-100">
+            <div className="bg-white p-2 rounded-lg shadow-lg">
+              <QRCode value={verifyUrl} size={64} />
+            </div>
+            <p className="text-[6px] text-center font-bold uppercase mt-1 tracking-wider text-blue-900 bg-white/80 rounded px-1">Authentique</p>
+          </div>
+        )}
+
         {/* WATERMARK BROUILLON */}
         {isDraft && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 z-0">
@@ -608,6 +677,15 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 z-0">
             <p className="text-[120px] font-bold text-red-500 -rotate-45 whitespace-nowrap select-none border-[12px] border-red-500 p-12 rounded-[3rem]">
               IMPAYÉ
+            </p>
+          </div>
+        )}
+
+        {/* WATERMARK PAYÉ (Fully Paid) */}
+        {!isDraft && data.type === DocumentType.INVOICE && amountPaid >= subtotal && subtotal > 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-15 z-0">
+            <p className="text-[120px] font-bold text-green-600 -rotate-45 whitespace-nowrap select-none border-[12px] border-green-600 p-12 rounded-[3rem]">
+              PAYÉ
             </p>
           </div>
         )}

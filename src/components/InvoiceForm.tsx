@@ -454,12 +454,12 @@ const InvoiceForm: React.FC<Props> = ({ data, products, customerBalance = 0, exi
                                                 Créer Facture
                                             </>
                                         ) : (
-                                            'Tout payer (Espèce)'
+                                            'Tout payer'
                                         )}
                                     </button>
                                     <div className="w-full sm:w-auto bg-white/10 p-1 rounded-xl border border-white/20 backdrop-blur-sm flex items-center">
                                         <div className="bg-blue-950/50 px-3 py-2 rounded-lg text-[9px] font-black uppercase text-blue-200 tracking-wider">
-                                            Reçu (Espèce)
+                                            Montant Reçu
                                         </div>
                                         <input
                                             type="number"

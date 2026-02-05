@@ -38,6 +38,11 @@ const ChangePasswordModal: React.FC<Props> = ({ onClose }) => {
             if (error) throw error;
 
             // Success
+
+            // Claim Welcome Bonus (New Logic: Only after verified + password set)
+            const { error: bonusError } = await supabase.rpc('claim_welcome_bonus');
+            if (bonusError) console.error("Bonus Error:", bonusError);
+
             localStorage.removeItem('reset_mode');
             onClose();
 

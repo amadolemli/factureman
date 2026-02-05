@@ -28,6 +28,7 @@ export interface BusinessInfo {
   customHeaderImage?: string;
   nif?: string;
   rccm?: string;
+  signatureUrl?: string; // Digital Signature URL from Storage
 }
 
 export interface Product {
