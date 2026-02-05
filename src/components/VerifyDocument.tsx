@@ -28,21 +28,28 @@ export const VerifyDocument = () => {
 
     const verifyInvoice = async (id: string) => {
         try {
-            // Fetch ONLY necessary columns for privacy
+            // Use Secure RPC to bypass RLS for public verification
             const { data, error } = await supabase
-                .from('invoices')
-                .select(`
-          id, type, number, date, total_amount, amount_paid, is_finalized, customer_name,
-          profiles ( business_name, phone, address )
-        `)
-                .eq('id', id)
+                .rpc('get_public_invoice_details', { target_invoice_id: id })
                 .single();
 
             if (error || !data) {
-                throw new Error("Document introuvable sur nos serveurs sécurisés.");
+                console.error("Verification Error:", error);
+                throw new Error("Document introuvable ou accès refusé.");
             }
 
-            setDocData(data);
+            // Map flat RPC result to component structure
+            const rpcData = data as any;
+            const mappedData = {
+                ...rpcData,
+                profiles: {
+                    business_name: rpcData.business_name,
+                    phone: rpcData.business_phone,
+                    address: rpcData.business_address
+                }
+            };
+
+            setDocData(mappedData);
             setValid(true);
         } catch (err: any) {
             console.error(err);
