@@ -342,11 +342,23 @@ const App: React.FC = () => {
             businessInfo: cloudData.businessInfo ? 'YES' : 'NO'
           });
 
-          // ALWAYS set cloud data (even if empty)
-          // This ensures cloud is truly the source of truth
-          setProducts(cloudData.products || []);
-          setHistory(cloudData.history || []);
-          setCredits(cloudData.credits || []);
+          // CRITICAL FIX: Only set cloud data if it has content
+          // Don't overwrite with empty arrays
+          if (cloudData.products && cloudData.products.length > 0) {
+            setProducts(cloudData.products);
+            console.log('✅ Products from cloud:', cloudData.products.length);
+          } else {
+            console.log('⚠️ No products in cloud, keeping current state');
+          }
+
+          if (cloudData.history && cloudData.history.length > 0) {
+            setHistory(cloudData.history);
+          }
+
+          if (cloudData.credits && cloudData.credits.length > 0) {
+            setCredits(cloudData.credits);
+          }
+
           if (cloudData.businessInfo) {
             setBusinessInfo(cloudData.businessInfo);
           }
@@ -422,8 +434,18 @@ const App: React.FC = () => {
   // Save Data on Change (Local + Cloud)
   useEffect(() => {
     const key = getStorageKey('inventory');
-    if (key) localStorage.setItem(key, JSON.stringify(products));
-    if (session?.user?.id) dataSyncService.saveProducts(products, session.user.id);
+    if (key) {
+      localStorage.setItem(key, JSON.stringify(products));
+      console.log('💾 Products saved to localStorage:', products.length);
+    }
+    if (session?.user?.id && products.length > 0) {
+      console.log('📤 Saving products to cloud...', products.length);
+      dataSyncService.saveProducts(products, session.user.id)
+        .then(() => console.log('✅ Products saved to cloud'))
+        .catch(err => console.error('❌ Error saving products:', err));
+    } else if (session?.user?.id && products.length === 0) {
+      console.warn('⚠️ Skipped cloud save: products is empty');
+    }
   }, [products, session]);
 
   useEffect(() => {
@@ -441,7 +463,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const key = getStorageKey('business');
     if (key) localStorage.setItem(key, JSON.stringify(businessInfo));
-    if (session?.user?.id) dataSyncService.saveBusinessInfo(businessInfo, session.user.id);
+
+    // Only save to cloud if we have a valid session and meaningful business info
+    if (session?.user?.id && businessInfo.name !== 'VOTRE ENTREPRISE') {
+      console.log('📤 Saving business info to cloud...');
+      dataSyncService.saveBusinessInfo(businessInfo, session.user.id)
+        .then(() => console.log('✅ Business info saved to cloud'))
+        .catch(err => console.error('❌ Error saving profile:', err));
+    }
 
     // Update current draft invoice business info if it's not finalized
     setInvoiceData(prev => {

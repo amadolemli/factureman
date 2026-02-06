@@ -73,7 +73,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
         try {
             const { data, error } = await supabase.rpc('get_admin_dashboard_stats');
             if (error) throw error;
-            setStats(data);
+            // RPC returns an array, take the first item
+            if (data && data.length > 0) {
+                // Map RPC columns to component state expectations if needed
+                // RPC returns: total_users, active_users_24h, total_credits_distributed, blocked_users, active_admins
+                // Accessing directly since keys match mostly, but let's be explicit
+                setStats({
+                    total_users: data[0].total_users,
+                    total_credits: data[0].total_credits_distributed, // Map distributed to total
+                    total_admins: data[0].active_admins,
+                    total_banned: data[0].blocked_users
+                });
+            }
         } catch (err) {
             console.error(err);
         }
