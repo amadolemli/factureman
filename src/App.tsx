@@ -68,6 +68,7 @@ const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false); // Guard against overwriting data before load
 
   // NOTIFICATION & SYNC STATE
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -314,8 +315,7 @@ const App: React.FC = () => {
     city: 'Ville'
   });
 
-  const [templatePreference, setTemplatePreference] = useState<'classic' | 'modern' | 'elegant'>('modern');
-
+  const [templatePreference, setTemplatePreference] = useState<'classic' | 'modern' | 'elegant'>('classic');
 
   // Load User Data on Session Change
   useEffect(() => {
@@ -422,10 +422,11 @@ const App: React.FC = () => {
           }
         }
         if (tplKey) {
-          setTemplatePreference((localStorage.getItem(tplKey) as any) || 'modern');
+          setTemplatePreference((localStorage.getItem(tplKey) as any) || 'classic');
         }
 
         console.log('✅ Data loading complete');
+        setIsDataLoaded(true);
       };
       loadData();
     }
@@ -483,6 +484,7 @@ const App: React.FC = () => {
 
   // Persist Template Preference & Update Draft
   useEffect(() => {
+    if (!isDataLoaded) return; // Wait for initial load
     const key = getStorageKey('template');
     if (key) localStorage.setItem(key, templatePreference);
 
@@ -493,7 +495,7 @@ const App: React.FC = () => {
       }
       return prev;
     });
-  }, [templatePreference, session]);
+  }, [templatePreference, session, isDataLoaded]);
 
   // AUTO SYNC & ALERTS CHECK LOOP
   useEffect(() => {
