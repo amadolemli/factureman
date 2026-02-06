@@ -985,12 +985,7 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
           <User size={18} /> Se déconnecter
         </button>
 
-        <button
-          onClick={onSync}
-          className="w-full mt-3 p-4 bg-blue-50 text-blue-700 rounded-xl border border-blue-100 flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors font-black uppercase text-xs"
-        >
-          <Activity size={18} /> Resynchroniser Données
-        </button>
+
 
         <button
           onClick={() => {
