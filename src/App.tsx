@@ -320,8 +320,15 @@ const App: React.FC = () => {
   // Load User Data on Session Change
   useEffect(() => {
     if (session?.user?.id) {
+      // Expose supabase for debugging
+      if (typeof window !== 'undefined') {
+        (window as any).supabase = supabase;
+        (window as any).userId = session.user.id;
+      }
+
       const loadData = async () => {
         console.log('🔄 Loading user data from cloud and localStorage...');
+        console.log('👤 User ID:', session.user.id);
 
         // 1. PRIORITIZE CLOUD DATA (Source of Truth)
         // This ensures users get their data back even after clearing browser
@@ -329,16 +336,24 @@ const App: React.FC = () => {
 
         if (cloudData) {
           console.log('✅ Cloud data loaded:', {
-            products: cloudData.products.length,
-            history: cloudData.history.length,
-            credits: cloudData.credits.length
+            products: cloudData.products?.length || 0,
+            history: cloudData.history?.length || 0,
+            credits: cloudData.credits?.length || 0,
+            businessInfo: cloudData.businessInfo ? 'YES' : 'NO'
           });
 
-          // Set cloud data as base
-          if (cloudData.products.length > 0) setProducts(cloudData.products);
-          if (cloudData.history.length > 0) setHistory(cloudData.history);
-          if (cloudData.credits.length > 0) setCredits(cloudData.credits);
-          if (cloudData.businessInfo) setBusinessInfo(cloudData.businessInfo);
+          // ALWAYS set cloud data (even if empty)
+          // This ensures cloud is truly the source of truth
+          setProducts(cloudData.products || []);
+          setHistory(cloudData.history || []);
+          setCredits(cloudData.credits || []);
+          if (cloudData.businessInfo) {
+            setBusinessInfo(cloudData.businessInfo);
+          }
+
+          console.log('✅ Cloud data applied to state');
+        } else {
+          console.warn('⚠️ No cloud data - possible connection issue');
         }
 
         // 2. Load Local Storage (For offline changes not yet synced)
