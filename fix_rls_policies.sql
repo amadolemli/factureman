@@ -63,16 +63,16 @@ DROP POLICY IF EXISTS "Users can view their own profile" ON profiles;
 
 CREATE POLICY "Users can insert their own profile"
 ON profiles FOR INSERT
-WITH CHECK (auth.uid() = id);
+WITH CHECK (auth.uid()::text = id::text);
 
 CREATE POLICY "Users can update their own profile"
 ON profiles FOR UPDATE
-USING (auth.uid() = id)
-WITH CHECK (auth.uid() = id);
+USING (auth.uid()::text = id::text)
+WITH CHECK (auth.uid()::text = id::text);
 
 CREATE POLICY "Users can view their own profile"
 ON profiles FOR SELECT
-USING (auth.uid() = id);
+USING (auth.uid()::text = id::text);
 
 -- ========================================
 -- 4. VÉRIFICATION
