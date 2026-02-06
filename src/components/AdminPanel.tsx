@@ -322,17 +322,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
                                                     <div className="font-bold text-gray-900 flex items-center gap-2">
                                                         {(user.business_name && user.business_name.trim() !== '' && user.business_name !== 'Ma Nouvelle Boutique')
                                                             ? user.business_name
-                                                            : (user.phone || `Utilisateur ${user.id.substring(0, 6)}`)}
+                                                            : `Utilisateur ${user.id.substring(0, 6)}`}
 
                                                         {user.is_super_admin && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1"><Star size={8} fill="currentColor" /> SUPER ADMIN</span>}
                                                         {!user.is_super_admin && user.is_admin && <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">ADMIN</span>}
                                                         {user.is_banned && <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full">BLOQUÉ</span>}
                                                     </div>
                                                     <div className="text-xs text-gray-500 font-mono flex items-center gap-2">
-                                                        {(user.business_name && user.phone) ? (
-                                                            <span className="font-bold text-blue-600 bg-blue-50 px-1 rounded">{user.phone}</span>
+                                                        {user.phone ? (
+                                                            <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{user.phone}</span>
                                                         ) : (
-                                                            <span>ID: {user.id}</span>
+                                                            <span className="text-gray-400">Aucun téléphone</span>
                                                         )}
                                                     </div>
                                                 </div>

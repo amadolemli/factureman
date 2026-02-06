@@ -321,62 +321,84 @@ const App: React.FC = () => {
   useEffect(() => {
     if (session?.user?.id) {
       const loadData = async () => {
-        // 1. Load Local Storage (Instant)
+        console.log('🔄 Loading user data from cloud and localStorage...');
+
+        // 1. PRIORITIZE CLOUD DATA (Source of Truth)
+        // This ensures users get their data back even after clearing browser
+        const cloudData = await dataSyncService.fetchUserData(session.user.id);
+
+        if (cloudData) {
+          console.log('✅ Cloud data loaded:', {
+            products: cloudData.products.length,
+            history: cloudData.history.length,
+            credits: cloudData.credits.length
+          });
+
+          // Set cloud data as base
+          if (cloudData.products.length > 0) setProducts(cloudData.products);
+          if (cloudData.history.length > 0) setHistory(cloudData.history);
+          if (cloudData.credits.length > 0) setCredits(cloudData.credits);
+          if (cloudData.businessInfo) setBusinessInfo(cloudData.businessInfo);
+        }
+
+        // 2. Load Local Storage (For offline changes not yet synced)
         const invKey = getStorageKey('inventory');
         const histKey = getStorageKey('history');
         const credKey = getStorageKey('credits');
         const busKey = getStorageKey('business');
         const tplKey = getStorageKey('template');
 
+        // Helper: Merge prioritizing CLOUD data but keeping local unsynced items
+        const mergeArrays = <T extends { id: string }>(cloud: T[], local: T[]): T[] => {
+          const map = new Map<string, T>();
+          // Cloud items first (source of truth)
+          cloud.forEach(item => map.set(item.id, item));
+          // Add local items that don't exist in cloud (new offline items)
+          local.forEach(item => {
+            if (!map.has(item.id)) {
+              map.set(item.id, item);
+            }
+          });
+          return Array.from(map.values());
+        };
+
         if (invKey) {
           const savedInv = localStorage.getItem(invKey);
-          if (savedInv) setProducts(JSON.parse(savedInv));
+          if (savedInv) {
+            const localProducts = JSON.parse(savedInv);
+            setProducts(prev => mergeArrays(prev, localProducts));
+          }
         }
         if (histKey) {
           const savedHist = localStorage.getItem(histKey);
-          if (savedHist) setHistory(JSON.parse(savedHist));
+          if (savedHist) {
+            const localHistory = JSON.parse(savedHist);
+            setHistory(prev => mergeArrays(prev, localHistory));
+          }
         }
         if (credKey) {
           const savedCred = localStorage.getItem(credKey);
-          if (savedCred) setCredits(JSON.parse(savedCred));
+          if (savedCred) {
+            const localCredits = JSON.parse(savedCred);
+            setCredits(prev => mergeArrays(prev, localCredits));
+          }
         }
         if (busKey) {
           const savedBus = localStorage.getItem(busKey);
-          if (savedBus) setBusinessInfo(JSON.parse(savedBus));
+          if (savedBus) {
+            const localBusiness = JSON.parse(savedBus);
+            // Only use local business if cloud doesn't have it or local is more recent
+            setBusinessInfo(prev => {
+              if (!prev || prev.name === 'VOTRE ENTREPRISE') return localBusiness;
+              return prev;
+            });
+          }
         }
         if (tplKey) {
           setTemplatePreference((localStorage.getItem(tplKey) as any) || 'modern');
         }
 
-        // 2. Load Cloud Data (Async & Merge)
-        const cloudData = await dataSyncService.fetchUserData(session.user.id);
-
-        // Helper: Merge prioritizing LOCAL data (Preserve offline edits)
-        const mergeArrays = <T extends { id: string }>(local: T[], cloud: T[]): T[] => {
-          const map = new Map<string, T>();
-          cloud.forEach(item => map.set(item.id, item));
-          local.forEach(item => map.set(item.id, item));
-          return Array.from(map.values());
-        };
-
-        if (cloudData) {
-          if (cloudData.products.length > 0) {
-            setProducts(prev => mergeArrays(prev, cloudData.products));
-          }
-          if (cloudData.history.length > 0) {
-            setHistory(prev => mergeArrays(prev, cloudData.history));
-          }
-          if (cloudData.credits.length > 0) {
-            setCredits(prev => mergeArrays(prev, cloudData.credits));
-          }
-          // Business Info: Only overwrite if local is default/empty, otherwise keep local (user might be editing)
-          if (cloudData.businessInfo) {
-            setBusinessInfo(prev => {
-              if (prev.name === 'VOTRE ENTREPRISE' || !prev.name) return cloudData.businessInfo!;
-              return prev;
-            });
-          }
-        }
+        console.log('✅ Data loading complete');
       };
       loadData();
     }
@@ -849,16 +871,28 @@ const App: React.FC = () => {
           date: finalDoc.date,
           customerName: finalName,
           customerPhone: finalDoc.customerPhone,
-          items: [{ id: 'pay1', quantity: 1, description: desc, unitPrice: paymentAmount }],
+          items: finalDoc.items,
           business: businessInfo,
           templateId: templatePreference,
           amountPaid: paymentAmount,
           isFinalized: true,
+          creditConfirmed: true,
           clientBalanceSnapshot: finalSnapshotBalance,
           createdAt: new Date().toISOString()
         };
         newHistory = [receiptDoc, ...newHistory];
       }
+
+      // 🔥 IMMEDIATE CLOUD SAVE - Don't wait for auto-sync
+      if (session?.user?.id && navigator.onLine) {
+        console.log('💾 Saving document to cloud immediately...');
+        dataSyncService.saveInvoices(newHistory, session.user.id).then(() => {
+          console.log('✅ Document saved to cloud successfully');
+        }).catch(err => {
+          console.error('❌ Failed to save document to cloud:', err);
+        });
+      }
+
       return newHistory;
     });
 

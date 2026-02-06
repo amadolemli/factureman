@@ -216,6 +216,86 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
         <AdminPanel currentUser={userProfile} onClose={() => setShowAdminPanel(false)} />
       )}
 
+      {/* SECTION SERVICE CLIENT - Visible pour tous */}
+      <div className="bg-gradient-to-r from-emerald-600 to-green-600 p-4 rounded-2xl shadow-lg border border-emerald-400 text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <MessageCircle size={24} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black uppercase">Service Client</h2>
+              <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest">Support FactureMan</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const phoneNumber = '0022378800849';
+              const text = `Service Client FactureMan\n${phoneNumber}`;
+
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(phoneNumber)
+                  .then(() => alert('✅ Numéro copié !\nVous pouvez le coller dans WhatsApp'))
+                  .catch(() => alert(`Numéro: ${phoneNumber}`));
+              } else {
+                // Fallback for older browsers
+                alert(`Service Client:\n${phoneNumber}\n\n(Appuyez longuement pour copier)`);
+              }
+            }}
+            className="px-4 py-2 bg-white text-emerald-700 rounded-xl font-bold text-xs uppercase hover:bg-emerald-50 transition-colors shadow-md active:scale-95"
+          >
+            Copier N°
+          </button>
+        </div>
+
+        {/* Phone Number Display with Action Buttons */}
+        <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-grow">
+              <Phone size={18} className="text-white/80" />
+              <span
+                className="text-lg font-black tracking-wider font-mono select-all"
+                onClick={() => {
+                  const phoneNumber = '0022378800849';
+                  if (navigator.clipboard) {
+                    navigator.clipboard.writeText(phoneNumber);
+                    alert('✅ Numéro copié !');
+                  }
+                }}
+              >
+                00223 78 80 08 49
+              </span>
+            </div>
+
+            <div className="flex gap-2">
+              {/* WhatsApp Button */}
+              <button
+                onClick={() => {
+                  window.open('https://wa.me/22378800849', '_blank');
+                }}
+                className="p-2 bg-white/90 text-green-600 rounded-lg hover:bg-white transition-all active:scale-90 shadow-md"
+                title="Écrire sur WhatsApp"
+              >
+                <MessageCircle size={20} />
+              </button>
+
+              {/* Call Button */}
+              <a
+                href="tel:+22378800849"
+                className="p-2 bg-white/90 text-emerald-700 rounded-lg hover:bg-white transition-all active:scale-90 shadow-md flex items-center justify-center"
+                title="Appeler"
+              >
+                <Phone size={20} />
+              </a>
+            </div>
+          </div>
+
+          <p className="text-[9px] text-white/70 mt-2 text-center font-bold uppercase tracking-wide">
+            Cliquez sur le numéro pour copier
+          </p>
+        </div>
+      </div>
+
       {/* SECTION BOUTIQUE */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
         <div className="flex items-center gap-3 mb-6">
