@@ -161,7 +161,7 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
                           )}
                         </span>
                         <span className={`font-black text-xs ${isReceipt ? 'text-green-600' : 'text-blue-900'}`}>
-                          {formatCurrency(total)} F
+                          {formatCurrency(isReceipt ? paid : total)} F
                         </span>
                       </div>
                     </div>

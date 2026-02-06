@@ -32,7 +32,7 @@ export const VerifyDocument = () => {
 
             // Use Secure RPC to bypass RLS for public verification
             const { data, error } = await supabase
-                .rpc('get_public_invoice_details', { target_invoice_id: id })
+                .rpc('get_public_invoice_details', { search_term: id })
                 .single();
 
             console.log("Supabase Verification Result:", { data, error });

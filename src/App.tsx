@@ -481,6 +481,7 @@ const App: React.FC = () => {
     });
   }, [businessInfo, session]);
 
+  // Persist Template Preference & Update Draft
   useEffect(() => {
     const key = getStorageKey('template');
     if (key) localStorage.setItem(key, templatePreference);

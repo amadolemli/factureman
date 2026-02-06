@@ -566,7 +566,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
 
             <div className="w-1/3 flex justify-center pb-2">
               {!isDraft && (
-                <div className="hidden md:block opacity-60">
+                <div className="block opacity-60">
                   <QRCode value={verifyUrl} size={42} />
                 </div>
               )}
