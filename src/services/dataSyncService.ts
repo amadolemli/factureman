@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { storageService } from './storageService';
 import { Product, InvoiceData, CreditRecord, BusinessInfo } from '../types';
 
 export const dataSyncService = {
@@ -65,7 +66,8 @@ export const dataSyncService = {
                     isFinalized: true,
                     creditConfirmed: inv.status === 'CONFIRMED',
                     clientBalanceSnapshot: content.clientBalanceSnapshot,
-                    createdAt: content.createdAt || inv.created_at // Fallback to DB timestamp if avail
+                    createdAt: content.createdAt || inv.created_at, // Fallback to DB timestamp if avail
+                    pdfUrl: inv.pdf_url // MAP FROM DB COLUMN
                 };
             });
 
@@ -111,19 +113,28 @@ export const dataSyncService = {
 
     async saveInvoices(invoices: InvoiceData[], userId: string) {
         if (!userId || invoices.length === 0) return;
-        const dbInvoices = invoices.map(inv => ({
-            id: inv.id,
-            user_id: userId,
-            number: inv.number,
-            type: inv.type,
-            date: inv.date,
-            customer_name: inv.customerName,
-            customer_phone: inv.customerPhone,
-            total_amount: inv.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
-            amount_paid: inv.amountPaid,
-            status: inv.creditConfirmed ? 'CONFIRMED' : 'PENDING',
-            content: inv // SAVE FULL OBJECT to preserve snapshots (business, balance, etc)
-        }));
+        const dbInvoices = invoices.map(inv => {
+            // Clean content to remove base64 heavy strings
+            const cleanContent = { ...inv };
+            if (cleanContent.business) {
+                cleanContent.business = storageService.cleanBusinessData(cleanContent.business);
+            }
+
+            return {
+                id: inv.id,
+                user_id: userId,
+                number: inv.number,
+                type: inv.type,
+                date: inv.date,
+                customer_name: inv.customerName,
+                customer_phone: inv.customerPhone,
+                total_amount: inv.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
+                amount_paid: inv.amountPaid,
+                status: inv.creditConfirmed ? 'CONFIRMED' : 'PENDING',
+                content: cleanContent, // SAVE Cleaned OBJECT
+                pdf_url: inv.pdfUrl || null // Sync the PDF URL column
+            };
+        });
         const { error } = await supabase.from('invoices').upsert(dbInvoices);
         if (error) console.error('Error saving invoices:', error);
     },
@@ -146,10 +157,14 @@ export const dataSyncService = {
 
     async saveBusinessInfo(info: BusinessInfo, userId: string) {
         if (!userId) return;
+
+        // Clean business info (remove base64)
+        const cleanInfo = storageService.cleanBusinessData(info);
+
         const { error } = await supabase.from('profiles').upsert({
             id: userId,
-            business_name: info.name,
-            business_info: info
+            business_name: cleanInfo.name,
+            business_info: cleanInfo
         });
         if (error) console.error('Error saving profile:', error);
     },

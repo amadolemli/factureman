@@ -95,6 +95,7 @@ export interface InvoiceData {
   creditConfirmed?: boolean;
   clientBalanceSnapshot?: number;
   createdAt?: string; // ISO String timestamp of creation
+  pdfUrl?: string; // NEW: Cloud Storage URL for the generated PDF
 }
 
 export enum AppStep {

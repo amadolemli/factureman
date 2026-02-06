@@ -6,6 +6,7 @@ import { BusinessInfo, InvoiceData, CreditRecord } from '../types';
 import { Settings, Image as ImageIcon, Palette, Store, MapPin, Phone, Briefcase, User, Search, MessageCircle, Contact2, Shield, Download, Upload, FileText, X, Info, Activity, Edit2, Save, UserPlus, Check, Share2, PenTool, Eraser } from 'lucide-react';
 import { testGeminiConnection } from '../services/geminiService';
 import { testMistralConnection } from '../services/mistralService';
+import { storageService } from '../services/storageService';
 import AdminPanel from './AdminPanel';
 import { UserProfile } from '../types';
 
@@ -40,16 +41,35 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const sigCanvasRef = useRef<SignatureCanvas | null>(null);
 
-  const saveSignature = () => {
+  const saveSignature = async () => {
     if (sigCanvasRef.current) {
       if (sigCanvasRef.current.isEmpty()) {
         alert("Veuillez signer avant de sauvegarder.");
         return;
       }
+
+      if (!userProfile?.id) {
+        alert("Erreur: Profil utilisateur introuvable.");
+        return;
+      }
+
       // Save as PNG data URL
       const signatureDataUrl = sigCanvasRef.current.getTrimmedCanvas().toDataURL('image/png');
-      onUpdateBusiness({ ...business, signatureUrl: signatureDataUrl });
-      setShowSignatureModal(false);
+
+      try {
+        const publicUrl = await storageService.uploadSignature(signatureDataUrl, userProfile.id);
+
+        if (publicUrl) {
+          onUpdateBusiness({ ...business, signatureUrl: publicUrl });
+          setShowSignatureModal(false);
+          alert("✅ Signature sauvegardée dans le Cloud !");
+        } else {
+          alert("Erreur lors de l'upload de la signature.");
+        }
+      } catch (e) {
+        console.error("Signature upload error", e);
+        alert("Erreur technique lors de la sauvegarde.");
+      }
     }
   };
 
@@ -92,8 +112,13 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
     imgRef.current = e.currentTarget;
   };
 
-  const generateCroppedImage = () => {
+  const generateCroppedImage = async () => {
     if (!completedCrop || !previewCanvasRef.current || !imgRef.current) return;
+
+    if (!userProfile?.id) {
+      alert("Erreur: Profil utilisateur introuvable. Veuillez vous reconnecter.");
+      return;
+    }
 
     const image = imgRef.current;
     const canvas = previewCanvasRef.current;
@@ -106,7 +131,6 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
     if (!ctx) return;
 
     // Set canvas size to the exact size of the cropped area in the original image
-    // This avoids using window.devicePixelRatio which can create huge canvases on mobile that crash
     canvas.width = crop.width * scaleX;
     canvas.height = crop.height * scaleY;
 
@@ -123,18 +147,31 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
       canvas.height
     );
 
-    // Convert to base64 and save
-    // Use lower quality (0.8) to save space if needed, but 1.0 is fine for headers usually
-    // If string is too long for localStorage, we might need to compress.
-    const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+    // Convert to Blob for upload
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        alert("Erreur lors de la création de l'image.");
+        return;
+      }
 
-    // Check if valid
-    if (base64Image && base64Image.length > 100) {
-      onUpdateBusiness({ ...business, customHeaderImage: base64Image });
-      setUpImg(null); // Close modal
-    } else {
-      alert("Erreur lors du traitement de l'image. Veuillez réessayer.");
-    }
+      // OPTIONNEL: Feedback visuel de chargement pourrait être ajouté ici
+
+      try {
+        const publicUrl = await storageService.uploadHeaderImage(blob, userProfile.id);
+
+        if (publicUrl) {
+          onUpdateBusiness({ ...business, customHeaderImage: publicUrl });
+          setUpImg(null); // Close modal
+          alert("✅ Image d'entête sauvegardée dans le Cloud !");
+        } else {
+          alert("Erreur lors de l'upload de l'image vers le Cloud.");
+        }
+      } catch (e) {
+        console.error("Upload error", e);
+        alert("Erreur technique lors de l'upload.");
+      }
+
+    }, 'image/jpeg', 0.9);
   };
 
   const templates = [

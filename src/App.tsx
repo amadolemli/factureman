@@ -542,9 +542,9 @@ const App: React.FC = () => {
       checkAlerts(products, walletCredits);
 
     }, 2 * 60 * 1000); // Every 2 minutes
-
     return () => clearInterval(interval);
   }, [session, products, history, credits, businessInfo, walletCredits]);
+
 
 
   const [invoiceData, setInvoiceData] = useState<InvoiceData>(() => ({
@@ -561,6 +561,70 @@ const App: React.FC = () => {
     isFinalized: false,
     creditConfirmed: false
   }));
+
+  // --- AUTO PDF GENERATION (SILENT) ---
+  useEffect(() => {
+    // Trigger ONLY if:
+    // 1. We are in PREVIEW mode
+    // 2. The document is FINALIZED
+    // 3. It doesn't have a PDF URL yet
+    // 4. We are ONLINE and logged in
+    if (step === AppStep.PREVIEW && invoiceData.isFinalized && !invoiceData.pdfUrl && session?.user?.id && navigator.onLine) {
+
+      const generateAndUpload = async () => {
+        // Wait for DOM render
+        await new Promise(r => setTimeout(r, 1500));
+
+        const element = document.getElementById('invoice-preview-container');
+        if (!element) {
+          console.warn("PDF Gen: Element not reserved or found");
+          return;
+        }
+
+        try {
+          console.log("📄 Auto-Generating PDF for Cloud...");
+          // @ts-ignore
+          const html2pdf = (await import('html2pdf.js')).default;
+
+          const opt = {
+            margin: 0,
+            filename: `DOC_${invoiceData.number}.pdf`,
+            image: { type: 'jpeg' as const, quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+          };
+
+          const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+          if (!pdfBlob) return;
+
+          const fileName = `FAC_${invoiceData.number}_${Date.now()}.pdf`;
+          const publicUrl = await storageService.uploadInvoicePDF(pdfBlob, fileName, session.user.id!);
+
+          if (publicUrl) {
+            console.log("☁️ PDF Uploaded Successfully:", publicUrl);
+
+            // Update State & DB
+            const updatedDoc = { ...invoiceData, pdfUrl: publicUrl };
+
+            // 1. Update Current View State
+            setInvoiceData(updatedDoc);
+
+            // 2. Update History State
+            setHistory(prev => prev.map(h => h.id === updatedDoc.id ? updatedDoc : h));
+
+            // 3. Update Cloud Metadata (Clean & Sync)
+            await storageService.saveInvoiceToCloud(updatedDoc, publicUrl);
+
+            setShowSuccessToast(true);
+          }
+        } catch (e) {
+          console.error("Auto PDF Error:", e);
+        }
+      };
+
+      generateAndUpload();
+    }
+  }, [step, invoiceData.isFinalized, invoiceData.pdfUrl, session]);
 
   // Reminder Logic
   // Calculate ALL clients from History and Credits for autocomplete
@@ -930,25 +994,22 @@ const App: React.FC = () => {
         newHistory = [receiptDoc, ...newHistory];
       }
 
-      // 🔥 IMMEDIATE CLOUD SAVE - Don't wait for auto-sync
+      // Note: Cloud save & PDF generation is now handled by a useEffect hook
+      // that waits for the Preview component to be fully mounted.
       if (session?.user?.id && navigator.onLine) {
-        console.log('💾 Saving document to cloud immediately...');
-        dataSyncService.saveInvoices(newHistory, session.user.id).then(() => {
-          console.log('✅ Document saved to cloud successfully');
-        }).catch(err => {
-          console.error('❌ Failed to save document to cloud:', err);
-        });
+        // We still save metadata immediately to be safe, but without PDF URL for now
+        dataSyncService.saveInvoices(newHistory, session.user.id).catch(console.error);
       }
 
       return newHistory;
     });
 
-    // SYNC: Automatic Cloud Backup (Metadata)
-    if (navigator.onLine) {
+    // Old simple sync removed in favor of the robust one above
+    /* if (navigator.onLine) {
       storageService.saveInvoiceToCloud(finalDoc)
         .then(ok => ok && console.log("Cloud Backup: Metadata Saved"))
         .catch(err => console.warn("Cloud Backup Failed", err));
-    }
+    } */
 
     setInvoiceData({ ...finalDoc, creditConfirmed: true, isFinalized: true });
     setShowSuccessToast(true);
@@ -1216,9 +1277,9 @@ const App: React.FC = () => {
         const pdfFile = new File([pdfBlob], `Facture_${doc.number}.pdf`, { type: 'application/pdf' });
 
         // SYNC: Upload PDF to Cloud Storage
-        if (navigator.onLine) {
+        if (navigator.onLine && session?.user?.id) {
           const safeName = `Facture_${doc.number.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
-          storageService.uploadInvoicePDF(pdfBlob, safeName)
+          storageService.uploadInvoicePDF(pdfBlob, safeName, session.user.id)
             .then(publicUrl => {
               if (publicUrl) {
                 console.log("Cloud Backup: PDF Uploaded", publicUrl);
@@ -1773,10 +1834,12 @@ const App: React.FC = () => {
 
         {step === AppStep.PREVIEW && (
           <div className="animate-in zoom-in-95 duration-300">
-            <InvoicePreview
-              data={invoiceData}
-              remainingBalance={!invoiceData.isFinalized ? currentCustomerCredit?.remainingBalance : undefined}
-            />
+            <div id="invoice-preview-container">
+              <InvoicePreview
+                data={invoiceData}
+                remainingBalance={!invoiceData.isFinalized ? currentCustomerCredit?.remainingBalance : undefined}
+              />
+            </div>
 
             <div className="mt-8 no-print max-w-2xl mx-auto space-y-4 mb-8">
               {!invoiceData.isFinalized ? (
