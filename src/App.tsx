@@ -1121,18 +1121,19 @@ const App: React.FC = () => {
 
     setHistory(prev => [receiptDoc, ...prev]);
 
+    // PREPARE MOVES (Moved out of setCredits scope to fix build error)
+    const moves: CreditHistoryItem[] = [{
+      type: 'PAYMENT' as const,
+      id: transactionId,
+      date: date,
+      createdAt: date,
+      amount: amount,
+      description: desc
+    }];
+
     // 3. UPDATE LEDGER
     setCredits(prev => {
       const existingIdx = prev.findIndex(c => c.customerName.toUpperCase() === normalizedName);
-
-      const moves: CreditHistoryItem[] = [{
-        type: 'PAYMENT' as const,
-        id: transactionId,
-        date: date,
-        createdAt: date,
-        amount: amount,
-        description: desc
-      }];
 
       if (existingIdx !== -1) {
         const existing = prev[existingIdx];
@@ -1151,7 +1152,8 @@ const App: React.FC = () => {
           customerPhone: '',
           totalDebt: 0,
           remainingBalance: -amount, // Negative = Credit
-          history: moves
+          history: moves,
+          appointments: [] // Ensure appointments init
         }, ...prev];
       }
     });
