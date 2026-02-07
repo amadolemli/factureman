@@ -428,8 +428,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
                                                 {log.target_phone && <span className="text-xs text-blue-600 bg-blue-50 px-1.5 rounded font-mono">{log.target_phone}</span>}
                                             </div>
                                         </div>
-                                        <div className="mt-2 bg-gray-50 p-2 rounded-lg text-xs font-mono text-gray-600 border border-gray-200">
-                                            {JSON.stringify(log.details)}
+
+                                        <div className="mt-2 bg-gray-50 p-2 rounded-lg text-xs text-gray-700 border border-gray-200">
+                                            {log.action === 'GRANT_CREDIT' && (
+                                                <span className="font-bold text-green-700">
+                                                    +{log.details?.amount?.toLocaleString()} Crédits ajoutés
+                                                </span>
+                                            )}
+                                            {(log.action === 'BAN_USER' || log.action === 'UNBAN_USER') && (
+                                                <span className={`font-bold ${log.details?.new_status ? 'text-red-600' : 'text-green-600'}`}>
+                                                    Statut: {log.details?.new_status ? 'BLOQUÉ' : 'DÉBLOQUÉ'}
+                                                </span>
+                                            )}
+                                            {log.action === 'DELETE_USER' && (
+                                                <span className="font-bold text-red-700">
+                                                    Raison: {log.details?.reason || 'Suppression Manuelle'}
+                                                </span>
+                                            )}
+                                            {log.action === 'PROMOTE_ADMIN' && (
+                                                <span className="font-bold text-purple-700">
+                                                    Promu ADMIN
+                                                </span>
+                                            )}
+                                            {/* Fallback for other details */}
+                                            {(!['GRANT_CREDIT', 'BAN_USER', 'UNBAN_USER', 'DELETE_USER', 'PROMOTE_ADMIN'].includes(log.action)) && (
+                                                <span className="font-mono text-gray-500">{JSON.stringify(log.details)}</span>
+                                            )}
                                         </div>
                                     </div>
                                 ))
@@ -439,7 +463,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
                 )}
 
             </div>
-        </div>,
+        </div >,
         document.body
     );
 };
