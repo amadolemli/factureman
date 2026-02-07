@@ -55,10 +55,13 @@ export const storageServiceV2 = {
     async uploadSignature(dataUrl: string, userId: string): Promise<string | null> {
         console.log('🔍 [SIGNATURE UPLOAD] Starting upload for user:', userId);
         try {
-            // Convertir data URL en Blob
-            console.log('📦 [SIGNATURE UPLOAD] Converting data URL to blob...');
-            const response = await fetch(dataUrl);
-            const blob = await response.blob();
+            // Convertir data URL en Blob sans utiliser fetch (pour éviter CSP error)
+            console.log('📦 [SIGNATURE UPLOAD] Converting data URL to blob (safe method)...');
+            const blob = this.base64ToBlob(dataUrl);
+
+            if (!blob) {
+                throw new Error("Failed to convert signature to Blob");
+            }
             console.log('✅ [SIGNATURE UPLOAD] Blob created:', blob.size, 'bytes, type:', blob.type);
 
             const timestamp = Date.now();
