@@ -416,10 +416,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
                                             </span>
                                             <span className="text-xs text-gray-400 font-mono">{new Date(log.created_at).toLocaleString()}</span>
                                         </div>
-                                        <div className="flex items-center gap-2 text-sm mt-2">
-                                            <span className="font-bold text-gray-900">{log.admin_business_name || 'Admin Inconnu'}</span>
-                                            <span className="text-gray-400">a agi sur</span>
-                                            <span className="font-bold text-gray-900">{log.target_business_name || 'Utilisateur Inconnu'}</span>
+                                        <div className="mt-2 space-y-1">
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <span className="text-gray-400 text-xs uppercase w-12">Admin:</span>
+                                                <span className="font-bold text-gray-900">{log.admin_business_name}</span>
+                                                {log.admin_phone && <span className="text-xs text-gray-500 bg-gray-100 px-1.5 rounded font-mono">{log.admin_phone}</span>}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <span className="text-gray-400 text-xs uppercase w-12">Cible:</span>
+                                                <span className="font-bold text-gray-900">{log.target_business_name}</span>
+                                                {log.target_phone && <span className="text-xs text-blue-600 bg-blue-50 px-1.5 rounded font-mono">{log.target_phone}</span>}
+                                            </div>
                                         </div>
                                         <div className="mt-2 bg-gray-50 p-2 rounded-lg text-xs font-mono text-gray-600 border border-gray-200">
                                             {JSON.stringify(log.details)}
