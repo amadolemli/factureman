@@ -465,8 +465,9 @@ const App: React.FC = () => {
     const key = getStorageKey('business');
     if (key) localStorage.setItem(key, JSON.stringify(businessInfo));
 
-    // Only save to cloud if we have a valid session
-    if (session?.user?.id) {
+    // Only save to cloud if we have a valid session AND data is loaded
+    // This prevents overwriting cloud data with initial default state on mount
+    if (session?.user?.id && isDataLoaded) {
       console.log('📤 Saving business info to cloud...');
       dataSyncService.saveBusinessInfo(businessInfo, session.user.id)
         .then(() => console.log('✅ Business info saved to cloud'))
@@ -480,7 +481,7 @@ const App: React.FC = () => {
       }
       return prev;
     });
-  }, [businessInfo, session]);
+  }, [businessInfo, session, isDataLoaded]);
 
   // Persist Template Preference & Update Draft
   useEffect(() => {
