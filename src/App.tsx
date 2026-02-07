@@ -192,7 +192,11 @@ const App: React.FC = () => {
       try {
         const localKey = `factureman_${userId}_profile`;
         const localProfile = localStorage.getItem(localKey);
-        if (localProfile) setUserProfile(JSON.parse(localProfile));
+        if (localProfile) {
+          const parsed = JSON.parse(localProfile);
+          setUserProfile(parsed);
+          if (parsed.business_info) setBusinessInfo(parsed.business_info);
+        }
       } catch (e) {
         console.error("Error loading local data", e);
       }
@@ -202,6 +206,7 @@ const App: React.FC = () => {
         .then(({ data }) => {
           if (data) {
             setUserProfile(data);
+            if (data.business_info) setBusinessInfo(data.business_info);
             localStorage.setItem(`factureman_${userId}_profile`, JSON.stringify(data));
           }
         });
