@@ -280,10 +280,8 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
     if (selectedCustomer && appointmentDate) {
       if (editingAppointmentId) {
         onUpdateAppointment(selectedCustomer.customerName, editingAppointmentId, appointmentDate, appointmentNote, notifyTiming);
-        alert("Rendez-vous modifié !");
       } else {
         onAddAppointment(selectedCustomer.customerName, appointmentDate, appointmentNote, notifyTiming);
-        alert("Rendez-vous programmé avec succès !");
       }
       window.history.back();
       setAppointmentDate('');

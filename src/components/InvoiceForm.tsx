@@ -157,10 +157,14 @@ const InvoiceForm: React.FC<Props> = ({ data, products, customerBalance = 0, exi
             <section className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1 relative">
-                        <label className="text-[8px] font-bold text-gray-400 uppercase ml-1">Nom du client</label>
+                        <div className="flex justify-between items-center ml-1">
+                            <label className={`text-[8px] font-bold uppercase ${balance > 0 && !data.customerName ? 'text-red-500' : 'text-gray-400'}`}>
+                                Nom du client {balance > 0 && !data.customerName && "(OBLIGATOIRE POUR CRÉDIT)"}
+                            </label>
+                        </div>
                         <input
                             type="text"
-                            className="w-full p-3 border rounded-xl font-bold uppercase text-blue-900"
+                            className={`w-full p-3 border rounded-xl font-bold uppercase text-blue-900 transition-all ${balance > 0 && !data.customerName ? 'border-red-300 bg-red-50 ring-2 ring-red-100 animate-pulse' : 'border-gray-200'}`}
                             value={data.customerName}
                             onChange={(e) => {
                                 onChange({ ...data, customerName: e.target.value });

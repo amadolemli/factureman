@@ -53,16 +53,21 @@ export const storageServiceV2 = {
      * @returns URL publique de la signature ou null
      */
     async uploadSignature(dataUrl: string, userId: string): Promise<string | null> {
+        console.log('🔍 [SIGNATURE UPLOAD] Starting upload for user:', userId);
         try {
             // Convertir data URL en Blob
+            console.log('📦 [SIGNATURE UPLOAD] Converting data URL to blob...');
             const response = await fetch(dataUrl);
             const blob = await response.blob();
+            console.log('✅ [SIGNATURE UPLOAD] Blob created:', blob.size, 'bytes, type:', blob.type);
 
             const timestamp = Date.now();
             const fileName = `signatures/signature_${timestamp}.png`;
             const filePath = `${userId}/${fileName}`;
+            console.log('📁 [SIGNATURE UPLOAD] Upload path:', filePath);
 
-            const { error: uploadError } = await supabase.storage
+            console.log('☁️ [SIGNATURE UPLOAD] Uploading to Supabase storage...');
+            const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('user-assets')
                 .upload(filePath, blob, {
                     contentType: 'image/png',
@@ -71,17 +76,29 @@ export const storageServiceV2 = {
                 });
 
             if (uploadError) {
-                console.error('Error uploading signature:', uploadError);
+                console.error('❌ [SIGNATURE UPLOAD] Error uploading signature:', uploadError);
+                console.error('❌ [SIGNATURE UPLOAD] Error details:', {
+                    message: uploadError.message,
+                    statusCode: uploadError.statusCode,
+                    error: uploadError
+                });
                 return null;
             }
+
+            console.log('✅ [SIGNATURE UPLOAD] Upload successful!', uploadData);
 
             const { data } = supabase.storage
                 .from('user-assets')
                 .getPublicUrl(filePath);
 
+            console.log('🔗 [SIGNATURE UPLOAD] Public URL generated:', data.publicUrl);
             return data.publicUrl;
         } catch (err) {
-            console.error('Upload signature exception:', err);
+            console.error('💥 [SIGNATURE UPLOAD] Exception:', err);
+            if (err instanceof Error) {
+                console.error('💥 [SIGNATURE UPLOAD] Error message:', err.message);
+                console.error('💥 [SIGNATURE UPLOAD] Error stack:', err.stack);
+            }
             return null;
         }
     },

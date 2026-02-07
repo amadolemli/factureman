@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, X, AlertTriangle, Info, CheckCircle, Package, Wallet } from 'lucide-react';
+import { Bell, X, AlertTriangle, Info, CheckCircle, Package, Wallet, Calendar } from 'lucide-react';
 import { Product, UserProfile } from '../types';
 
 export interface AppNotification {
@@ -87,8 +87,9 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, 
                                                 {notif.type === 'warning' && <AlertTriangle size={14} />}
                                                 {notif.type === 'alert' && <Wallet size={14} />}
                                                 {notif.type === 'success' && <CheckCircle size={14} />}
-                                                {notif.title.includes('Stock') && <Package size={14} />}
-                                                {(notif.type === 'info' && !notif.title.includes('Stock')) && <Info size={14} />}
+                                                {(notif.title.includes('Stock') || notif.title.includes('épuisé')) && <Package size={14} />}
+                                                {notif.title.includes('Rendez-vous') && <Calendar size={14} />}
+                                                {(notif.type === 'info' && !notif.title.includes('Stock') && !notif.title.includes('Rendez-vous')) && <Info size={14} />}
                                             </div>
 
                                             <div className="flex-1 min-w-0">

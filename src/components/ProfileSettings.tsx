@@ -2,12 +2,14 @@ import React, { useRef, useState, useMemo } from 'react';
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import SignatureCanvas from 'react-signature-canvas';
 import 'react-image-crop/dist/ReactCrop.css';
+import { trimCanvas } from '../utils/trimCanvas';
 import { BusinessInfo, InvoiceData, CreditRecord } from '../types';
 import { Settings, Image as ImageIcon, Palette, Store, MapPin, Phone, Briefcase, User, Search, MessageCircle, Contact2, Shield, Download, Upload, FileText, X, Info, Activity, Edit2, Save, UserPlus, Check, Share2, PenTool, Eraser } from 'lucide-react';
 import { testGeminiConnection } from '../services/geminiService';
 import { testMistralConnection } from '../services/mistralService';
 import { storageService } from '../services/storageService';
 import AdminPanel from './AdminPanel';
+import { StorageDiagnostic } from './StorageDiagnostic';
 import { UserProfile } from '../types';
 
 interface Props {
@@ -39,6 +41,7 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
 
   // Signature State
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
   const sigCanvasRef = useRef<SignatureCanvas | null>(null);
 
   const saveSignature = async () => {
@@ -48,27 +51,40 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
         return;
       }
 
+      console.log('👤 [PROFILE] User profile:', userProfile);
+
       if (!userProfile?.id) {
-        alert("Erreur: Profil utilisateur introuvable.");
+        alert("Erreur: Profil utilisateur introuvable. Veuillez vous reconnecter.");
+        console.error('❌ [PROFILE] No user profile found:', userProfile);
         return;
       }
 
+      console.log('🖊️ [PROFILE] Generating signature data URL...');
       // Save as PNG data URL
-      const signatureDataUrl = sigCanvasRef.current.getTrimmedCanvas().toDataURL('image/png');
+      // Use custom trimCanvas utility to avoid broken dependency
+      const canvas = sigCanvasRef.current.getCanvas();
+      const trimmedCanvas = trimCanvas(canvas);
+      const signatureDataUrl = trimmedCanvas.toDataURL('image/png');
+      console.log('✅ [PROFILE] Signature data URL generated, length:', signatureDataUrl.length);
 
       try {
+        console.log('📤 [PROFILE] Calling uploadSignature...');
         const publicUrl = await storageService.uploadSignature(signatureDataUrl, userProfile.id);
+        console.log('📥 [PROFILE] Upload result:', publicUrl);
 
         if (publicUrl) {
+          console.log('✅ [PROFILE] Updating business with signature URL...');
           onUpdateBusiness({ ...business, signatureUrl: publicUrl });
           setShowSignatureModal(false);
-          alert("✅ Signature sauvegardée dans le Cloud !");
+          // Alert removed for seamless experience
         } else {
-          alert("Erreur lors de l'upload de la signature.");
+          console.error('❌ [PROFILE] Upload returned null');
+          alert("❌ Erreur lors de l'upload de la signature.\n\nVérifiez:\n1. Que vous êtes connecté à Internet\n2. Que le bucket Supabase est configuré\n3. La console du navigateur pour plus de détails");
         }
       } catch (e) {
-        console.error("Signature upload error", e);
-        alert("Erreur technique lors de la sauvegarde.");
+        console.error("💥 [PROFILE] Signature upload error", e);
+        const errorMessage = e instanceof Error ? e.message : 'Erreur inconnue';
+        alert(`❌ Erreur technique lors de la sauvegarde:\n${errorMessage}\n\nConsultez la console pour plus de détails.`);
       }
     }
   };
@@ -162,7 +178,7 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
         if (publicUrl) {
           onUpdateBusiness({ ...business, customHeaderImage: publicUrl });
           setUpImg(null); // Close modal
-          alert("✅ Image d'entête sauvegardée dans le Cloud !");
+          // Alert removed for seamless experience
         } else {
           alert("Erreur lors de l'upload de l'image vers le Cloud.");
         }
@@ -553,6 +569,13 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
             <p className="text-[10px] text-gray-400 text-center max-w-sm">
               Cette signature sera apposée automatiquement au bas de vos factures et reçus pour les authentifier visuellement.
             </p>
+            {/* Diagnostic Button */}
+            <button
+              onClick={() => setShowDiagnostic(true)}
+              className="mt-3 text-[10px] text-blue-600 hover:text-blue-800 font-bold uppercase tracking-wider underline"
+            >
+              🔧 Problème d'upload ? Lancer le diagnostic
+            </button>
           </div>
         </div>
 
@@ -1060,6 +1083,19 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
           </p>
         </div>
       </div>
+
+      {/* Storage Diagnostic Modal */}
+      {showDiagnostic && (
+        <div className="fixed inset-0 z-[200]">
+          <StorageDiagnostic />
+          <button
+            onClick={() => setShowDiagnostic(false)}
+            className="absolute top-4 right-4 bg-white text-gray-800 px-4 py-2 rounded-xl font-bold text-sm shadow-lg hover:bg-gray-100 z-[201]"
+          >
+            Fermer
+          </button>
+        </div>
+      )}
     </div>
   );
 };

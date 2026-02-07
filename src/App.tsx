@@ -42,88 +42,117 @@ const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.FORM);
   const [previousStep, setPreviousStep] = useState<AppStep>(AppStep.FORM);
 
-  const goToStep = (newStep: AppStep) => {
-    if (newStep === AppStep.PREVIEW) {
-      setPreviousStep(step);
-    }
-    setStep(newStep);
-    window.scrollTo(0, 0);
-    // Sync history so we stay on 'app' level but update content info
-    window.history.replaceState({ step: newStep, level: 'app' }, '');
-  };
-
+  // --- 1. CORE STATE & REFS ---
+  const [products, setProducts] = useState<Product[]>([]);
+  const [history, setHistory] = useState<InvoiceData[]>([]);
+  const [credits, setCredits] = useState<CreditRecord[]>([]);
+  const [businessInfo, setBusinessInfo] = useState<BusinessInfo>({
+    name: 'VOTRE ENTREPRISE',
+    specialty: 'Votre spécialité',
+    address: 'Adresse...',
+    phone: 'Tél...',
+    city: 'Ville'
+  });
+  const [templatePreference, setTemplatePreference] = useState<'classic' | 'modern' | 'elegant'>('classic');
   const [showOnboarding, setShowOnboarding] = useState(false);
-
   const [showSuccessToast, setShowSuccessToast] = useState(false);
-  const [showExitToast, setShowExitToast] = useState(false); // New State for Exit Toast
+  const [showExitToast, setShowExitToast] = useState(false);
   const [showConvertMenu, setShowConvertMenu] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Ref to track current step for event listeners
   const stepRef = useRef<AppStep>(AppStep.FORM);
-  useEffect(() => { stepRef.current = step; }, [step]);
+  const exitAttemptRef = useRef(false);
 
-  // AUTHENTICATION STATE
+  // AUTH STATE
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
-  const [isDataLoaded, setIsDataLoaded] = useState(false); // Guard against overwriting data before load
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // NOTIFICATION & SYNC STATE
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error' | 'success' | 'offline'>('idle');
 
-  // --- CHECKERS ---
+  // CUSTOM HOOKS
+  const { walletCredits, setWalletCredits } = useWallet(session, userProfile, setUserProfile);
+  const { canPerformAction, incrementOfflineCount, offlineCount, maxOfflineDocs, hasUnpaidDebt, attemptToPayDebt } = useOfflineActivity();
+
+  // --- 2. HELPERS ---
+  const goToStep = (newStep: AppStep) => {
+    if (newStep === AppStep.PREVIEW) setPreviousStep(step);
+    setStep(newStep);
+    window.scrollTo(0, 0);
+    window.history.replaceState({ step: newStep, level: 'app' }, '');
+  };
+
   const addNotification = (notif: Omit<AppNotification, 'id' | 'date' | 'read'>) => {
     setNotifications(prev => {
-      // Avoid duplicate titles (simple dedup)
       if (prev.some(n => n.title === notif.title && n.read === false)) return prev;
-      return [{
-        ...notif,
-        id: generateUUID(),
-        date: new Date(),
-        read: false
-      }, ...prev];
+      return [{ ...notif, id: generateUUID(), date: new Date(), read: false }, ...prev];
     });
   };
 
-  const checkAlerts = (currentProducts: Product[], currentCredits: number) => {
-    // 1. Stock Alert
+  const checkAlerts = (currentProducts: Product[], currentCredits: number, currentClients: CreditRecord[]) => {
+    // Stock Alert
     const lowStock = currentProducts.filter(p => p.stock > 0 && p.stock <= 5);
     if (lowStock.length > 0) {
-      addNotification({
-        type: 'warning',
-        title: 'Stock Faible',
-        message: `${lowStock.length} produit(s) sont presque épuisés (stock <= 5). Vérifiez votre inventaire.`
-      });
+      addNotification({ type: 'warning', title: 'Stock Faible', message: `${lowStock.length} produits bientôt épuisés.` });
     }
-
-    // 2. Credits Alert
+    // Credits Alert
     if (currentCredits < 200 && currentCredits > 0) {
-      addNotification({
-        type: 'alert',
-        title: 'Crédits Bas',
-        message: `Il ne vous reste que ${currentCredits} crédits. Les scans et sauvegardes cloud risquent d'échouer.`
-      });
+      addNotification({ type: 'alert', title: 'Crédits Bas', message: `Solde : ${currentCredits} crédits.` });
     }
+    // Appointments Alert
+    const today = new Date().toDateString();
+    currentClients.forEach(client => {
+      (client.appointments || []).forEach(appt => {
+        if (!appt.completed && new Date(appt.date).toDateString() === today) {
+          addNotification({
+            type: 'info',
+            title: `Rendez-vous : ${client.customerName}`,
+            message: `RDV à ${new Date(appt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. ${appt.note ? `Note: ${appt.note}` : ''}`
+          });
+
+          // Also trigger browser notification if not already done today
+          if (Notification.permission === 'granted') {
+            const notifiedKey = `notif_done_${appt.id}`;
+            if (!localStorage.getItem(notifiedKey)) {
+              new Notification(`Rendez-vous : ${client.customerName}`, {
+                body: `Aujourd'hui à ${new Date(appt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+                icon: '/pwa-192x192.png',
+                tag: appt.id // Dedup at OS level
+              });
+              localStorage.setItem(notifiedKey, 'true');
+            }
+          }
+        }
+      });
+    });
   };
+
+  const getStorageKey = (key: string) => {
+    if (!session?.user?.id) return null;
+    return `factureman_${session.user.id}_${key}`;
+  };
+
+  // --- 3. EFFECTS ---
+  useEffect(() => { stepRef.current = step; }, [step]);
 
   useEffect(() => {
     const handleOnline = () => setSyncStatus('idle');
     const handleOffline = () => {
       setSyncStatus('offline');
-      addNotification({
-        type: 'warning',
-        title: 'Mode Hors-Ligne',
-        message: 'Vous êtes déconnecté. Vos données sont sauvegardées localement et seront synchronisées au retour de la connexion.'
-      });
+      addNotification({ type: 'warning', title: 'Mode Hors-Ligne', message: 'Opération en mode local.' });
     };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     // Initial check
     if (!navigator.onLine) handleOffline();
+
+    // 2. Notifications Permission & Restoration
+    notificationService.requestPermission();
+    notificationService.restoreSchedules();
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -131,56 +160,49 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // 4. REACTIVE ALERTS CHECK
   useEffect(() => {
-    // 1. Check active session
+    if (isDataLoaded) {
+      checkAlerts(products, walletCredits, credits);
+    }
+  }, [credits, products, walletCredits, isDataLoaded]);
+
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
     });
-
-    // 2. Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setAuthLoading(false);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  // Check for Password Reset Mode
   useEffect(() => {
     if (session && localStorage.getItem('reset_mode') === 'true') {
       setShowPasswordResetModal(true);
     }
   }, [session]);
 
-  // PROFILE & CREDITS MANAGEMENT
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-
-  // SECURE OFFLINE WALLET (Cash on Device)
-  const { walletCredits, setWalletCredits } = useWallet(session, userProfile, setUserProfile);
-
   useEffect(() => {
     if (session?.user) {
+      const userId = session.user.id;
       // 0. LOAD LOCAL DATA
       try {
-        const userId = session.user.id;
-
-        // Profile (Bank Info)
         const localKey = `factureman_${userId}_profile`;
         const localProfile = localStorage.getItem(localKey);
         if (localProfile) setUserProfile(JSON.parse(localProfile));
-
-      } catch (e) { console.error("Error loading local data", e); }
+      } catch (e) {
+        console.error("Error loading local data", e);
+      }
 
       // 1. Fetch Cloud Profile (Bank Balance)
-      supabase.from('profiles').select('*').eq('id', session.user.id).single()
-        .then(({ data, error }) => {
+      supabase.from('profiles').select('*').eq('id', userId).single()
+        .then(({ data }) => {
           if (data) {
             setUserProfile(data);
-            localStorage.setItem(`factureman_${session.user.id}_profile`, JSON.stringify(data));
+            localStorage.setItem(`factureman_${userId}_profile`, JSON.stringify(data));
           }
         });
 
@@ -188,12 +210,11 @@ const App: React.FC = () => {
       const channel = supabase.channel('realtime-profile')
         .on(
           'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` },
+          { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
           (payload) => {
             const newProfile = payload.new as UserProfile;
             setUserProfile(newProfile);
-            localStorage.setItem(`factureman_${session.user.id}_profile`, JSON.stringify(newProfile));
-            // Removed sticky toast for background update
+            localStorage.setItem(`factureman_${userId}_profile`, JSON.stringify(newProfile));
             addNotification({
               type: 'success',
               title: 'Crédits Reçus',
@@ -203,14 +224,20 @@ const App: React.FC = () => {
         )
         .subscribe();
 
+      // 3. INITIAL ALERTS CHECK (Delayed to allow state hydration)
+      setTimeout(() => {
+        setIsDataLoaded(true); // This will trigger the reactive effect
+      }, 3000);
+
       // Check onboarding status
       const hasSeen = localStorage.getItem('has_seen_onboarding');
       if (!hasSeen) setShowOnboarding(true);
 
-    } else {
-      // Logic for handling implicit logout or checks
+      return () => {
+        channel.unsubscribe();
+      };
     }
-  }, [session]);
+  }, [session, products, walletCredits, credits]);
 
   // PERSIST PROFILE CHANGES (Optimistic updates included)
   useEffect(() => {
@@ -249,7 +276,6 @@ const App: React.FC = () => {
   // };
 
   // --- DOUBLE BACK TO EXIT LOGIC ---
-  const exitAttemptRef = useRef(false);
 
   useEffect(() => {
     // 1. Establish History Guard on Mount
@@ -295,27 +321,7 @@ const App: React.FC = () => {
   // ------------------------
 
   // --- DATA PERSISTENCE (USER ISOLATED) ---
-  const getStorageKey = (key: string) => {
-    if (!session?.user?.id) return null;
-    return `factureman_${session.user.id}_${key}`;
-  };
-
-  // --- STATE DECLARATIONS ---
-  const [products, setProducts] = useState<Product[]>([]);
-  const [history, setHistory] = useState<InvoiceData[]>([]);
-  const [credits, setCredits] = useState<CreditRecord[]>([]);
-
-  /* REMOVED FROM HERE, SEE BELOW */
-
-  const [businessInfo, setBusinessInfo] = useState<BusinessInfo>({
-    name: 'VOTRE ENTREPRISE',
-    specialty: 'Votre spécialité',
-    address: 'Adresse...',
-    phone: 'Tél...',
-    city: 'Ville'
-  });
-
-  const [templatePreference, setTemplatePreference] = useState<'classic' | 'modern' | 'elegant'>('classic');
+  /* Logic moved to section 2 helpers */
 
   // Load User Data on Session Change
   useEffect(() => {
@@ -538,11 +544,8 @@ const App: React.FC = () => {
       } else {
         setSyncStatus('error');
       }
-
-      // Check alerts every cycle
-      checkAlerts(products, walletCredits);
-
     }, 2 * 60 * 1000); // Every 2 minutes
+
     return () => clearInterval(interval);
   }, [session, products, history, credits, businessInfo, walletCredits]);
 
@@ -563,69 +566,74 @@ const App: React.FC = () => {
     creditConfirmed: false
   }));
 
-  // --- AUTO PDF GENERATION (SILENT) ---
+  // --- BACKGROUND PDF GENERATION SYSTEM ---
+  const [backgroundPdfDoc, setBackgroundPdfDoc] = useState<InvoiceData | null>(null);
+
   useEffect(() => {
-    // Trigger ONLY if:
-    // 1. We are in PREVIEW mode
-    // 2. The document is FINALIZED
-    // 3. It doesn't have a PDF URL yet
-    // 4. We are ONLINE and logged in
-    if (step === AppStep.PREVIEW && invoiceData.isFinalized && !invoiceData.pdfUrl && session?.user?.id && navigator.onLine) {
+    // 1. Scan for documents in history that are finalized but missing a PDF URL
+    if (session?.user?.id && navigator.onLine && !backgroundPdfDoc) {
+      const pendingDoc = history.find(h => h.isFinalized && !h.pdfUrl);
+      if (pendingDoc) {
+        // Debounce slightly to avoid heavy load
+        const timer = setTimeout(() => setBackgroundPdfDoc(pendingDoc), 5000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [history, session, backgroundPdfDoc]);
 
-      const generateAndUpload = async () => {
-        // Wait for DOM render
-        await new Promise(r => setTimeout(r, 1500));
-
-        const element = document.getElementById('invoice-preview-container');
-        if (!element) {
-          console.warn("PDF Gen: Element not reserved or found");
-          return;
-        }
+  // Handle Background PDF Generation
+  useEffect(() => {
+    if (backgroundPdfDoc && session?.user?.id && navigator.onLine) {
+      const generateForBackground = async () => {
+        const element = document.getElementById('background-pdf-container');
+        if (!element) return;
 
         try {
-          console.log("📄 Auto-Generating PDF for Cloud...");
+          console.log(`📄 Background PDF Gen for: ${backgroundPdfDoc.number}...`);
           // @ts-ignore
           const html2pdf = (await import('html2pdf.js')).default;
-
           const opt = {
             margin: 0,
-            filename: `DOC_${invoiceData.number}.pdf`,
+            filename: `DOC_${backgroundPdfDoc.number}.pdf`,
             image: { type: 'jpeg' as const, quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
           };
 
           const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
-          if (!pdfBlob) return;
-
-          const fileName = `FAC_${invoiceData.number}_${Date.now()}.pdf`;
+          const fileName = `FAC_${backgroundPdfDoc.number}_${Date.now()}.pdf`;
           const publicUrl = await storageService.uploadInvoicePDF(pdfBlob, fileName, session.user.id!);
 
           if (publicUrl) {
-            console.log("☁️ PDF Uploaded Successfully:", publicUrl);
+            console.log(`☁️ Background PDF Uploaded: ${backgroundPdfDoc.number}`, publicUrl);
+            const updatedDoc = { ...backgroundPdfDoc, pdfUrl: publicUrl };
 
-            // Update State & DB
-            const updatedDoc = { ...invoiceData, pdfUrl: publicUrl };
-
-            // 1. Update Current View State
-            setInvoiceData(updatedDoc);
-
-            // 2. Update History State
+            // Update state
             setHistory(prev => prev.map(h => h.id === updatedDoc.id ? updatedDoc : h));
+            if (invoiceData.id === updatedDoc.id) setInvoiceData(updatedDoc);
 
-            // 3. Update Cloud Metadata (Clean & Sync)
+            // Update Metadata
             await storageService.saveInvoiceToCloud(updatedDoc, publicUrl);
-
-            // Removed sticky toast for background PDF upload
           }
         } catch (e) {
-          console.error("Auto PDF Error:", e);
+          console.error("Background PDF Error:", e);
+        } finally {
+          setBackgroundPdfDoc(null);
         }
       };
 
-      generateAndUpload();
+      // Small delay to ensure render
+      setTimeout(generateForBackground, 2000);
     }
-  }, [step, invoiceData.isFinalized, invoiceData.pdfUrl, session]);
+  }, [backgroundPdfDoc, session]);
+
+  // Keep the current view generation for reactive UI update
+  useEffect(() => {
+    if (step === AppStep.PREVIEW && invoiceData.isFinalized && !invoiceData.pdfUrl && session?.user?.id && navigator.onLine) {
+      // Just set it as background doc if it's not already something else
+      if (!backgroundPdfDoc) setBackgroundPdfDoc(invoiceData);
+    }
+  }, [step, invoiceData.isFinalized, invoiceData.pdfUrl, session, backgroundPdfDoc]);
 
   // Reminder Logic
   // Calculate ALL clients from History and Credits for autocomplete
@@ -746,22 +754,11 @@ const App: React.FC = () => {
     };
 
     setInvoiceData(newDoc);
-    setInvoiceData(newDoc);
     goToStep(AppStep.FORM); // Converting sends back to form
     setShowConvertMenu(false);
     setShowSuccessToast(true);
     setTimeout(() => setShowSuccessToast(false), 2000);
   };
-
-  // --- OFFLINE ACTIVITY LIMITS & DEFERRED BILLING ---
-  const { canPerformAction, incrementOfflineCount, offlineCount, maxOfflineDocs, hasUnpaidDebt, attemptToPayDebt } = useOfflineActivity();
-
-  // If debt exists blocking the user, we can auto-prompt or just rely on the button clicks
-  useEffect(() => {
-    if (hasUnpaidDebt && navigator.onLine) {
-      // Optionally prompt user: "Sync successful payment required"
-    }
-  }, [hasUnpaidDebt]);
 
   // --- SCANNER LOGIC (Refactored to Hook) ---
   const { isScanning, scanFile } = useScanner({
@@ -866,6 +863,17 @@ const App: React.FC = () => {
       incrementOfflineCount();
     }
 
+    const currentTotalVal = docToProcess.items.reduce((acc, i) => acc + (i.unitPrice * i.quantity), 0);
+    const paymentAmount = docToProcess.amountPaid || 0;
+    const balance = currentTotalVal - paymentAmount;
+
+    // 0.1 REQUIRE NAME FOR DEBT
+    if (balance > 0 && !docToProcess.customerName.trim() && docToProcess.type === DocumentType.INVOICE) {
+      alert("Un nom de client est OBLIGATOIRE pour les ventes à crédit (Impayé).\nVeuillez saisir le nom du client dans la partie 'Saisie'.");
+      goToStep(AppStep.FORM);
+      return;
+    }
+
     const finalName = docToProcess.customerName.trim().toUpperCase() || "CLIENT COMPTANT";
     const finalDoc = {
       ...docToProcess,
@@ -874,15 +882,15 @@ const App: React.FC = () => {
       creditConfirmed: true,
       createdAt: new Date().toISOString()
     };
-
-    const currentTotalVal = finalDoc.items.reduce((acc, i) => acc + (i.unitPrice * i.quantity), 0);
-    const paymentAmount = finalDoc.amountPaid || 0;
     const normalizedName = finalName.toUpperCase();
+
+    // 2. CREDIT UPDATE & SYNC PREPARATION
+    let updatedCreditData: CreditRecord | null = null;
+    let newCreditData: CreditRecord | null = null;
 
     if (finalDoc.type === DocumentType.INVOICE || finalDoc.type === DocumentType.RECEIPT) {
       setCredits(prevCredits => {
         const existingIdx = prevCredits.findIndex(c => c.customerName.toUpperCase() === normalizedName);
-
         let amountToAddToBalance = 0;
         let moves: CreditHistoryItem[] = [];
 
@@ -891,7 +899,7 @@ const App: React.FC = () => {
         } else {
           amountToAddToBalance = currentTotalVal - paymentAmount;
           moves.push({
-            type: 'INVOICE' as const,
+            type: 'INVOICE',
             id: finalDoc.id,
             date: finalDoc.date,
             createdAt: finalDoc.createdAt,
@@ -902,7 +910,7 @@ const App: React.FC = () => {
 
         if (paymentAmount > 0) {
           moves.push({
-            type: 'PAYMENT' as const,
+            type: 'PAYMENT',
             id: `pay-${finalDoc.id}`,
             date: finalDoc.date,
             createdAt: finalDoc.createdAt,
@@ -913,33 +921,34 @@ const App: React.FC = () => {
 
         if (existingIdx !== -1) {
           const existing = prevCredits[existingIdx];
-          const updatedList = [...prevCredits];
-          updatedList[existingIdx] = {
+          const updatedRecord = {
             ...existing,
             customerPhone: finalDoc.customerPhone || existing.customerPhone,
             totalDebt: existing.totalDebt + (finalDoc.type === DocumentType.INVOICE ? currentTotalVal : 0),
             remainingBalance: existing.remainingBalance + amountToAddToBalance,
             history: [...moves, ...existing.history]
           };
+          const updatedList = [...prevCredits];
+          updatedList[existingIdx] = updatedRecord;
+          updatedCreditData = updatedRecord; // Capture for sync
           return updatedList;
         } else {
-          // NEW CLIENT
-          return [{
-            id: Math.random().toString(36).substr(2, 9),
+          const newClient = {
+            id: generateUUID(),
             customerName: normalizedName,
             customerPhone: finalDoc.customerPhone,
             totalDebt: finalDoc.type === DocumentType.INVOICE ? currentTotalVal : 0,
             remainingBalance: amountToAddToBalance,
-            history: moves
-          }, ...prevCredits];
+            history: moves,
+            appointments: []
+          };
+          newCreditData = newClient; // Capture for sync
+          return [newClient, ...prevCredits];
         }
       });
     }
 
-    // 3. Track Activity (Already handled in the top block)
-    // incrementOfflineCount(); // REMOVED here, moved to top conditional block
-
-    // 4. Update Stock
+    // 3. UPDATE STOCK
     if (finalDoc.type !== DocumentType.RECEIPT && finalDoc.type !== DocumentType.PROFORMA && finalDoc.type !== DocumentType.QUOTE) {
       setProducts(prevProds => {
         const updatedProducts = [...prevProds];
@@ -953,64 +962,64 @@ const App: React.FC = () => {
       });
     }
 
-    // 5. Update History
-    setHistory(prev => {
-      // Find existing credit using CURRENT state (closure capture might be stale but relative calc handles it)
-      // Ideally we would chain this but state is separated.
-      const existingCredit = credits.find(c => c.customerName.toUpperCase() === normalizedName);
-      const previousBalance = existingCredit ? existingCredit.remainingBalance : 0;
+    // 4. PREPARE HISTORY & SYNC DOCUMENTS
+    // Calculate snapshot balance for history
+    const previousBalance = credits.find(c => c.customerName.toUpperCase() === normalizedName)?.remainingBalance || 0;
+    const balanceChange = (finalDoc.type === DocumentType.RECEIPT) ? -paymentAmount : (currentTotalVal - paymentAmount);
+    const finalSnapshotBalance = previousBalance + balanceChange;
 
-      const balanceChange = (finalDoc.type === DocumentType.RECEIPT) ? -paymentAmount : (currentTotalVal - paymentAmount);
-      const finalSnapshotBalance = previousBalance + balanceChange; // Approximate immediate snapshot
+    const finalInvoice = { ...finalDoc, clientBalanceSnapshot: finalSnapshotBalance };
+    let newHistoryItems: InvoiceData[] = [finalInvoice];
 
-      let newHistory = [...prev];
+    if (paymentAmount > 0 && finalDoc.type !== DocumentType.RECEIPT) {
+      const parts = generateInvoiceNumber().split('-');
+      let desc = paymentAmount === currentTotalVal ? `RÈGLEMENT TOTAL ${finalDoc.type} ${finalDoc.number}` : `ACOMPTE ${finalDoc.type} ${finalDoc.number}`;
+      if (paymentAmount > currentTotalVal) desc = `RÈGLEMENT ${finalDoc.type} ${finalDoc.number} + VERS. AVOIR`;
 
-      const finalInvoice = {
-        ...finalDoc,
-        clientBalanceSnapshot: finalSnapshotBalance
+      const receiptDoc: InvoiceData = {
+        id: `pay-${finalDoc.id}`,
+        type: DocumentType.RECEIPT,
+        number: `R-${parts[1]}`, // Keep number generation consistent if possible or use new UUID
+        date: finalDoc.date,
+        customerName: finalName,
+        customerPhone: finalDoc.customerPhone,
+        items: [{ id: 'auto-receipt', quantity: 1, description: desc, unitPrice: paymentAmount }], // Fix missing items structure for receipt
+        business: businessInfo,
+        templateId: templatePreference,
+        amountPaid: paymentAmount,
+        isFinalized: true,
+        creditConfirmed: true,
+        clientBalanceSnapshot: finalSnapshotBalance,
+        createdAt: new Date().toISOString()
       };
-      newHistory = [finalInvoice, ...newHistory];
+      newHistoryItems.push(receiptDoc);
+    }
 
-      if (paymentAmount > 0 && finalDoc.type !== DocumentType.RECEIPT) {
-        const parts = generateInvoiceNumber().split('-');
-        let desc = paymentAmount === currentTotalVal ? `RÈGLEMENT TOTAL ${finalDoc.type} ${finalDoc.number}` : `ACOMPTE ${finalDoc.type} ${finalDoc.number}`;
-        if (paymentAmount > currentTotalVal) desc = `RÈGLEMENT ${finalDoc.type} ${finalDoc.number} + VERS. AVOIR`;
+    // Update History State
+    setHistory(prev => [...newHistoryItems, ...prev]);
 
-        const receiptDoc: InvoiceData = {
-          id: `pay-${finalDoc.id}`,
-          type: DocumentType.RECEIPT,
-          number: `R-${parts[1]}`,
-          date: finalDoc.date,
-          customerName: finalName,
-          customerPhone: finalDoc.customerPhone,
-          items: finalDoc.items,
-          business: businessInfo,
-          templateId: templatePreference,
-          amountPaid: paymentAmount,
-          isFinalized: true,
-          creditConfirmed: true,
-          clientBalanceSnapshot: finalSnapshotBalance,
-          createdAt: new Date().toISOString()
-        };
-        newHistory = [receiptDoc, ...newHistory];
-      }
+    // 5. PERFORM CLOUD SYNC (Async)
+    if (session?.user?.id && navigator.onLine) {
+      const output = document.getElementById('background-pdf-container'); // Use background container if visual glitch
+      // Actually we just save metadata first. PDF happens in background effect.
+      // But we must save the record to DB.
 
-      // Note: Cloud save & PDF generation is now handled by a useEffect hook
-      // that waits for the Preview component to be fully mounted.
-      if (session?.user?.id && navigator.onLine) {
-        // We still save metadata immediately to be safe, but without PDF URL for now
-        dataSyncService.saveInvoices(newHistory, session.user.id).catch(console.error);
-      }
+      const syncPromises = [];
+      newHistoryItems.forEach(doc => {
+        syncPromises.push(dataSyncService.saveSingleInvoice(doc, session.user.id!));
+      });
 
-      return newHistory;
-    });
+      // Sync Client
+      if (updatedCreditData) syncPromises.push(dataSyncService.saveSingleClient(updatedCreditData, session.user.id!));
+      if (newCreditData) syncPromises.push(dataSyncService.saveSingleClient(newCreditData, session.user.id!));
 
-    // Old simple sync removed in favor of the robust one above
-    /* if (navigator.onLine) {
-      storageService.saveInvoiceToCloud(finalDoc)
-        .then(ok => ok && console.log("Cloud Backup: Metadata Saved"))
-        .catch(err => console.warn("Cloud Backup Failed", err));
-    } */
+      Promise.all(syncPromises)
+        .then(() => console.log("☁️ Sync Success"))
+        .catch(err => {
+          console.error("Cloud Sync Error", err);
+          alert("Sauvegarde Cloud échouée. Vos données sont locales.");
+        });
+    }
 
     setInvoiceData({ ...finalDoc, creditConfirmed: true, isFinalized: true });
     setShowSuccessToast(true);
@@ -1147,7 +1156,45 @@ const App: React.FC = () => {
       }
     });
 
-    // 4. FEEDBACK
+    // 4. DIRECT CLOUD SYNC
+    if (session?.user?.id && navigator.onLine) {
+      try {
+        await dataSyncService.saveSingleInvoice(receiptDoc, session.user.id);
+
+        // Prepare updated client for sync logic (Need to reconstruct effectively or use what we simulated)
+        // Since setCredits is async, we can't grab 'updatedClient' from state yet.
+        // We use the same calculation as above.
+
+        const existingClient = credits.find(c => c.customerName.toUpperCase() === normalizedName);
+        let clientToSync: CreditRecord;
+
+        if (existingClient) {
+          clientToSync = {
+            ...existingClient,
+            remainingBalance: existingClient.remainingBalance - amount,
+            history: [...moves, ...existingClient.history]
+          };
+        } else {
+          clientToSync = {
+            id: generateUUID(),
+            customerName: normalizedName,
+            customerPhone: '',
+            totalDebt: 0,
+            remainingBalance: -amount,
+            history: moves,
+            appointments: [] // Ensure appointments init
+          };
+        }
+
+        await dataSyncService.saveSingleClient(clientToSync, session.user.id);
+
+      } catch (err) {
+        console.error("Payment Sync Failed", err);
+        alert("Erreur de sauvegarde cloud pour le paiement.");
+      }
+    }
+
+    // 5. FEEDBACK
     setShowSuccessToast(true);
     setTimeout(() => setShowSuccessToast(false), 2000);
   };
@@ -1903,6 +1950,12 @@ const App: React.FC = () => {
           </div>
         </nav>
       )}
+      {/* BACKGROUND PDF GENERATOR (Hidden) */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', overflow: 'hidden', height: 0, width: 0 }} aria-hidden="true">
+        <div id="background-pdf-container">
+          {backgroundPdfDoc && <InvoicePreview data={backgroundPdfDoc} />}
+        </div>
+      </div>
     </div>
   );
 };

@@ -407,7 +407,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
                                 <div className="p-8 text-center text-gray-400">Aucune activité enregistrée.</div>
                             ) : (
                                 logs.map((log: any) => (
-                                    <div key={log.id} className="p-4 hover:bg-gray-50 transition-colors">
+                                    <div key={log.log_id} className="p-4 hover:bg-gray-50 transition-colors">
                                         <div className="flex justify-between items-start mb-1">
                                             <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${log.action === 'DELETE_USER' ? 'bg-red-100 text-red-700' :
                                                 log.action === 'GRANT_CREDIT' ? 'bg-green-100 text-green-700' :
@@ -420,13 +420,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
                                         <div className="mt-2 space-y-1">
                                             <div className="flex items-center gap-2 text-sm">
                                                 <span className="text-gray-400 text-xs uppercase w-12">Admin:</span>
-                                                <span className="font-bold text-gray-900">{log.admin_business_name}</span>
-                                                {log.admin_phone && <span className="text-xs text-gray-500 bg-gray-100 px-1.5 rounded font-mono">{log.admin_phone}</span>}
+                                                <span className="font-bold text-gray-900">{log.admin_business_name || 'Admin Inconnu'}</span>
+                                                {log.admin_phone ? (
+                                                    <span className="text-xs text-gray-500 bg-gray-100 px-1.5 rounded font-mono">{log.admin_phone}</span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-300 italic">No Phone</span>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-2 text-sm">
                                                 <span className="text-gray-400 text-xs uppercase w-12">Cible:</span>
-                                                <span className="font-bold text-gray-900">{log.target_business_name}</span>
-                                                {log.target_phone && <span className="text-xs text-blue-600 bg-blue-50 px-1.5 rounded font-mono">{log.target_phone}</span>}
+                                                <span className="font-bold text-gray-900">{log.target_business_name || 'Utilisateur (Inconnu/Supprimé)'}</span>
+                                                {log.target_phone ? (
+                                                    <span className="text-xs text-blue-600 bg-blue-50 px-1.5 rounded font-mono">{log.target_phone}</span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-300 italic">No Phone</span>
+                                                )}
                                             </div>
                                         </div>
 

@@ -113,35 +113,58 @@ export const dataSyncService = {
 
     async saveInvoices(invoices: InvoiceData[], userId: string) {
         if (!userId || invoices.length === 0) return;
-        const dbInvoices = invoices.map(inv => {
-            // Clean content to remove base64 heavy strings
-            const cleanContent = { ...inv };
-            if (cleanContent.business) {
-                cleanContent.business = storageService.cleanBusinessData(cleanContent.business);
-            }
-
-            return {
-                id: inv.id,
-                user_id: userId,
-                number: inv.number,
-                type: inv.type,
-                date: inv.date,
-                customer_name: inv.customerName,
-                customer_phone: inv.customerPhone,
-                total_amount: inv.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
-                amount_paid: inv.amountPaid,
-                status: inv.creditConfirmed ? 'CONFIRMED' : 'PENDING',
-                content: cleanContent, // SAVE Cleaned OBJECT
-                pdf_url: inv.pdfUrl || null // Sync the PDF URL column
-            };
-        });
+        const dbInvoices = invoices.map(inv => this.mapInvoiceToDb(inv, userId));
         const { error } = await supabase.from('invoices').upsert(dbInvoices);
         if (error) console.error('Error saving invoices:', error);
     },
 
+    async saveSingleInvoice(invoice: InvoiceData, userId: string) {
+        if (!userId) return;
+        const dbInvoice = this.mapInvoiceToDb(invoice, userId);
+        const { error } = await supabase.from('invoices').upsert(dbInvoice);
+        if (error) console.error('Error saving single invoice:', error);
+        return !error;
+    },
+
+    mapInvoiceToDb(inv: InvoiceData, userId: string) {
+        // Clean content to remove base64 heavy strings
+        const cleanContent = { ...inv };
+        if (cleanContent.business) {
+            cleanContent.business = storageService.cleanBusinessData(cleanContent.business);
+        }
+        return {
+            id: inv.id,
+            user_id: userId,
+            number: inv.number,
+            type: inv.type,
+            date: inv.date,
+            customer_name: inv.customerName,
+            customer_phone: inv.customerPhone,
+            total_amount: inv.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
+            amount_paid: inv.amountPaid,
+            status: inv.creditConfirmed ? 'CONFIRMED' : 'PENDING',
+            content: cleanContent, // SAVE Cleaned OBJECT
+            pdf_url: inv.pdfUrl || null // Sync the PDF URL column
+        };
+    },
+
     async saveCreditRecords(credits: CreditRecord[], userId: string) {
         if (!userId || credits.length === 0) return;
-        const dbClients = credits.map(c => ({
+        const dbClients = credits.map(c => this.mapClientToDb(c, userId));
+        const { error } = await supabase.from('clients').upsert(dbClients);
+        if (error) console.error('Error saving clients:', error);
+    },
+
+    async saveSingleClient(client: CreditRecord, userId: string) {
+        if (!userId) return;
+        const dbClient = this.mapClientToDb(client, userId);
+        const { error } = await supabase.from('clients').upsert(dbClient);
+        if (error) console.error('Error saving single client:', error);
+        return !error;
+    },
+
+    mapClientToDb(c: CreditRecord, userId: string) {
+        return {
             id: c.id,
             user_id: userId,
             name: c.customerName,
@@ -150,9 +173,7 @@ export const dataSyncService = {
             remaining_balance: c.remainingBalance,
             history: c.history,
             appointments: c.appointments
-        }));
-        const { error } = await supabase.from('clients').upsert(dbClients);
-        if (error) console.error('Error saving clients:', error);
+        };
     },
 
     async saveBusinessInfo(info: BusinessInfo, userId: string) {
