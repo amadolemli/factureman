@@ -14,57 +14,84 @@ export const notificationService = {
         return permission === "granted";
     },
 
-    // Planifier une notification
+    // Planifier une notification (SAFE MODE)
     scheduleNotification: async (id: string, title: string, body: string, appointmentDate: string, delayMinutes: number = 60) => {
-        if (!("Notification" in window)) return;
+        try {
+            // Safety Check 1: API Presence
+            if (!("Notification" in window)) {
+                console.warn("Notifications non supportées sur cet appareil");
+                return;
+            }
 
-        if (Notification.permission !== "granted") {
-            const permission = await Notification.requestPermission();
-            if (permission !== "granted") return;
-        }
-
-        // Calculer le délai
-        const apptTime = new Date(appointmentDate).getTime();
-        const notifyTime = apptTime - (delayMinutes * 60 * 1000); // Retrait du délai (15 ou 60 min)
-        const now = new Date().getTime();
-        const delay = notifyTime - now;
-
-        if (delay > 0) {
-            // Si le délai est raisonnable (ex: moins de 24h et navigateur ouvert), on utilise setTimeout
-            // Note: Pour une "vraie" planification robuste web, il faudrait un Service Worker.
-            // Ici on simule une planification "session" comme demandé pour le web standard.
-
-            // Sauvegarder dans le localStorage pour persistance (si l'onglet est rouvert)
-            // On stocke : ID -> { title, body, time }
-            const scheduled = JSON.parse(localStorage.getItem('mali_facture_notifications') || '{}');
-            scheduled[id] = { title, body, notifyTime };
-            localStorage.setItem('mali_facture_notifications', JSON.stringify(scheduled));
-
-            console.log(`Notification planifiée pour dans ${(delay / 60000).toFixed(0)} minutes`);
-
-            setTimeout(() => {
-                // Double check si toujours valide (pas annulé)
-                const currentScheduled = JSON.parse(localStorage.getItem('mali_facture_notifications') || '{}');
-                if (currentScheduled[id]) {
-                    // 1. Play Sound
-                    try {
-                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Simple 'Ding' sound
-                        audio.volume = 0.5;
-                        audio.play().catch(e => console.warn("Audio play blocked", e));
-                    } catch (e) { }
-
-                    // 2. Show Notification
-                    new Notification(title, {
-                        body: body,
-                        icon: '/pwa-192x192.png', // Correct PWA Icon
-                        requireInteraction: true
-                    });
-
-                    // Nettoyer après envoi
-                    delete currentScheduled[id];
-                    localStorage.setItem('mali_facture_notifications', JSON.stringify(currentScheduled));
+            // Safety Check 2: Permission (Async)
+            if (Notification.permission !== "granted") {
+                try {
+                    const permission = await Notification.requestPermission();
+                    if (permission !== "granted") return;
+                } catch (e) {
+                    console.warn("Notification permission request failed", e);
+                    return;
                 }
-            }, delay);
+            }
+
+            // Calculer le délai
+            const apptTime = new Date(appointmentDate).getTime();
+            if (isNaN(apptTime)) return; // Invalid date safety
+
+            const notifyTime = apptTime - (delayMinutes * 60 * 1000);
+            const now = new Date().getTime();
+            const delay = notifyTime - now;
+
+            if (delay > 0) {
+                // Sauvegarder dans localStorage (Safe Parse)
+                try {
+                    const stored = localStorage.getItem('mali_facture_notifications');
+                    const scheduled = stored ? JSON.parse(stored) : {};
+                    scheduled[id] = { title, body, notifyTime };
+                    localStorage.setItem('mali_facture_notifications', JSON.stringify(scheduled));
+                } catch (storageError) {
+                    console.error("Storage error for notification", storageError);
+                }
+
+                console.log(`Notification planifiée pour dans ${(delay / 60000).toFixed(0)} minutes`);
+
+                setTimeout(() => {
+                    try {
+                        const stored = localStorage.getItem('mali_facture_notifications');
+                        const currentScheduled = stored ? JSON.parse(stored) : {};
+
+                        if (currentScheduled[id]) {
+                            // 1. Play Sound (Safe)
+                            try {
+                                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                                audio.volume = 0.5;
+                                audio.play().catch(() => { }); // Ignore play errors (autoplay policy)
+                            } catch (e) { }
+
+                            // 2. Show Notification (Safe)
+                            try {
+                                // Service Worker fallback check for mobile could go here
+                                new Notification(title, {
+                                    body: body,
+                                    icon: '/pwa-192x192.png',
+                                    requireInteraction: true
+                                });
+                            } catch (notifError) {
+                                console.error("Notification display error", notifError);
+                            }
+
+                            // Nettoyer
+                            delete currentScheduled[id];
+                            localStorage.setItem('mali_facture_notifications', JSON.stringify(currentScheduled));
+                        }
+                    } catch (timeoutError) {
+                        console.error("Timeout execution error", timeoutError);
+                    }
+                }, delay);
+            }
+        } catch (globalError) {
+            console.error("Critical Notification Error", globalError);
+            // Prevent app crash by catching top level
         }
     },
 
