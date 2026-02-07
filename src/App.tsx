@@ -193,7 +193,7 @@ const App: React.FC = () => {
             const newProfile = payload.new as UserProfile;
             setUserProfile(newProfile);
             localStorage.setItem(`factureman_${session.user.id}_profile`, JSON.stringify(newProfile));
-            setShowSuccessToast(true);
+            // Removed sticky toast for background update
             addNotification({
               type: 'success',
               title: 'Crédits Reçus',
@@ -465,8 +465,8 @@ const App: React.FC = () => {
     const key = getStorageKey('business');
     if (key) localStorage.setItem(key, JSON.stringify(businessInfo));
 
-    // Only save to cloud if we have a valid session and meaningful business info
-    if (session?.user?.id && businessInfo.name !== 'VOTRE ENTREPRISE') {
+    // Only save to cloud if we have a valid session
+    if (session?.user?.id) {
       console.log('📤 Saving business info to cloud...');
       dataSyncService.saveBusinessInfo(businessInfo, session.user.id)
         .then(() => console.log('✅ Business info saved to cloud'))
@@ -615,7 +615,7 @@ const App: React.FC = () => {
             // 3. Update Cloud Metadata (Clean & Sync)
             await storageService.saveInvoiceToCloud(updatedDoc, publicUrl);
 
-            setShowSuccessToast(true);
+            // Removed sticky toast for background PDF upload
           }
         } catch (e) {
           console.error("Auto PDF Error:", e);

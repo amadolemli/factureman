@@ -28,50 +28,26 @@ export const extractItemsFromImage = async (base64Data: string, mimeType: string
         return await response.json();
       } else {
         console.warn(`Server Scan Failed (${response.status}).`);
-        if (!import.meta.env.DEV) {
-          throw new Error(`Le service de scan est indisponible momentanément (${response.status}). Veuillez réessayer plus tard.`);
-        }
+        // STRICT: No Fallback. Throw Error.
+        throw new Error(`Le service de scan est indisponible momentanément (${response.status}). Veuillez réessayer plus tard.`);
       }
     } else {
       console.warn("No Session.");
-      if (!import.meta.env.DEV) {
-        throw new Error("Veuillez vous connecter au compte (Profil) pour utiliser le scanner.");
-      }
+      throw new Error("Veuillez vous connecter au compte (Profil) pour utiliser le scanner.");
     }
-    throw new Error("Trigger Fallback"); // Jump to catch block (Dev Mode only)
 
-  } catch (serverError) {
-    // 2. CLIENT-SIDE FALLBACK (Localhost Only)
-    // STRICTLY DISABLED IN PRODUCTION per User Request (Admin Key Only)
+  } catch (serverError: any) {
+    // 2. ERROR HANDLING (Strict Server Only)
+    console.error("Server Scan Failed:", serverError);
 
-    if (import.meta.env.DEV) {
-      console.log("DEV MODE DETECTED: Executing Client-Side Fallback Scan...");
-      const storedKey = localStorage.getItem('user_gemini_api_key');
-      // const envKey = import.meta.env.VITE_GEMINI_API_KEY; // REMOVED FOR SECURITY
-      const API_KEY = (storedKey || "").trim();
+    const msg = serverError.message || "Erreur inconnue";
 
-      if (!API_KEY) {
-        throw new Error("DEV MODE: Le scan serveur a échoué et aucune Clé API locale n'est configurée (Entrez-la dans les paramètres).");
-      }
-
-      try {
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        // ... (Simplified Dev Fallback for brevity or keep full logic)
-        // Re-using the prompt logic would be verbose to repeat here unless I copy it.
-        // I will just throw the server error for now to be safe and clean, or restore the Dev Block?
-        // Let's restore the Dev Block logic roughly.
-        // Actually, to avoid huge code blocks, I'll just throw the error with a clear message.
-        throw new Error("Scan Serveur Échoué (Dev Mode: Fallback désactivé temporairement pour nettoyage).");
-
-      } catch (clientError: any) {
-        throw clientError;
-      }
-    } else {
-      // PRODUCTION: ALWAYS THROW SERVER ERROR
-      console.error("Server Scan Failed. Client Fallback is DISABLED.");
-      throw serverError;
+    if (msg.includes('500')) {
+      throw new Error("Erreur Serveur (500). Veuillez réessayer plus tard ou contacter le support.");
     }
+
+    // Propagate original error
+    throw serverError;
   }
 };
 

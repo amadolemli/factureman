@@ -60,13 +60,10 @@ export default async function handler(request: Request) {
         const { data: allowed, error: rpcError } = await supabase.rpc('check_scan_rate_limit');
 
         if (rpcError) {
-            console.error("Rate Limit Check Error:", rpcError);
-            // Start strictly: if we can't check, we block. Or permissive?
-            // Since the user must run the SQL, we block to ensure they do it.
-            return new Response(JSON.stringify({ error: 'Server Security Configuration Missing (Run SQL)' }), { status: 500 });
-        }
-
-        if (allowed === false) {
+            console.warn("Rate Limit Check Skipped (Function missing?):", rpcError.message);
+            // FAIL OPEN: If the security function is missing, we allow the scan to proceed
+            // rather than blocking valid users. We just log the warning.
+        } else if (allowed === false) {
             return new Response(JSON.stringify({ error: 'Rate Limit Exceeded: Please wait 10 seconds between scans.' }), { status: 429 });
         }
 

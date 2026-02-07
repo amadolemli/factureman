@@ -164,7 +164,10 @@ export const dataSyncService = {
         const { error } = await supabase.from('profiles').upsert({
             id: userId,
             business_name: cleanInfo.name,
-            business_info: cleanInfo
+            business_info: cleanInfo,
+            // Sync specific columns for easier access/backup
+            header_image_url: cleanInfo.customHeaderImage,
+            signature_url: cleanInfo.signatureUrl
         });
         if (error) console.error('Error saving profile:', error);
     },
