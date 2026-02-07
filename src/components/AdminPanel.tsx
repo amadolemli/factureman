@@ -49,8 +49,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser, onClose }) => {
             const { data, error } = await supabase.rpc('get_admin_logs');
             if (error) throw error;
             setLogs(data || []);
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            setMessage({ type: 'error', text: "Erreur lecture logs: " + (err.message || String(err)) });
         }
     };
 
