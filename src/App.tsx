@@ -124,11 +124,31 @@ const App: React.FC = () => {
           if (Notification.permission === 'granted') {
             const notifiedKey = `notif_done_${appt.id}`;
             if (!localStorage.getItem(notifiedKey)) {
-              new Notification(`Rendez-vous : ${client.customerName}`, {
-                body: `Aujourd'hui à ${formatDateSafe(appt.date, { hour: '2-digit', minute: '2-digit' })}`,
-                icon: '/pwa-192x192.png',
-                tag: appt.id // Dedup at OS level
-              });
+              // SAFE NOTIFICATION HANDLER (Fixes Mobile Crash)
+              try {
+                const title = `Rendez-vous : ${client.customerName}`;
+                const options = {
+                  body: `Aujourd'hui à ${formatDateSafe(appt.date, { hour: '2-digit', minute: '2-digit' })}`,
+                  icon: '/pwa-192x192.png',
+                  tag: appt.id
+                };
+
+                if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+                  navigator.serviceWorker.ready.then(registration => {
+                    registration.showNotification(title, options);
+                  }).catch(e => console.warn('SW Notification failed', e));
+                } else {
+                  // Fallback for Desktop (if supported)
+                  try {
+                    new Notification(title, options);
+                  } catch (e) {
+                    console.warn('Desktop Notification failed', e);
+                  }
+                }
+              } catch (e) {
+                console.error('Notification Error (Safe):', e);
+              }
+
               localStorage.setItem(notifiedKey, 'true');
             }
           }
