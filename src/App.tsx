@@ -32,11 +32,17 @@ import OnboardingTour from './components/OnboardingTour';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import NotificationCenter, { AppNotification } from './components/NotificationCenter';
 import { VerifyDocument } from './components/VerifyDocument';
+import DiagnosticsPage from './components/DiagnosticsPage';
 
 const App: React.FC = () => {
   // ROUTING HACK: Simple manual routing for Verification Page
   if (window.location.pathname.startsWith('/verify')) {
     return <VerifyDocument />;
+  }
+
+  // Diagnostics Page (for debugging mobile issues)
+  if (window.location.pathname.startsWith('/diagnostics')) {
+    return <DiagnosticsPage />;
   }
 
   const [step, setStep] = useState<AppStep>(AppStep.FORM);
@@ -168,10 +174,16 @@ const App: React.FC = () => {
   }, [credits, products, walletCredits, isDataLoaded]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setAuthLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setAuthLoading(false);
+      })
+      .catch((error) => {
+        console.error('🚨 Error getting session:', error);
+        setAuthLoading(false);
+      });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setAuthLoading(false);
@@ -188,6 +200,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (session?.user) {
       const userId = session.user.id;
+
       // 0. LOAD LOCAL DATA
       try {
         const localKey = `factureman_${userId}_profile`;
@@ -203,31 +216,48 @@ const App: React.FC = () => {
 
       // 1. Fetch Cloud Profile (Bank Balance)
       supabase.from('profiles').select('*').eq('id', userId).single()
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('🚨 Error fetching profile:', error);
+            return;
+          }
           if (data) {
             setUserProfile(data);
             if (data.business_info) setBusinessInfo(data.business_info);
-            localStorage.setItem(`factureman_${userId}_profile`, JSON.stringify(data));
+            try {
+              localStorage.setItem(`factureman_${userId}_profile`, JSON.stringify(data));
+            } catch (e) {
+              console.warn('Failed to save profile to localStorage', e);
+            }
           }
         });
 
       // 2. Realtime Updates (Bank Deposits)
-      const channel = supabase.channel('realtime-profile')
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
-          (payload) => {
-            const newProfile = payload.new as UserProfile;
-            setUserProfile(newProfile);
-            localStorage.setItem(`factureman_${userId}_profile`, JSON.stringify(newProfile));
-            addNotification({
-              type: 'success',
-              title: 'Crédits Reçus',
-              message: `Votre solde a été mis à jour : ${newProfile.app_credits} crédits disponibles.`
-            });
-          }
-        )
-        .subscribe();
+      let channel: any = null;
+      try {
+        channel = supabase.channel('realtime-profile')
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+            (payload) => {
+              try {
+                const newProfile = payload.new as UserProfile;
+                setUserProfile(newProfile);
+                localStorage.setItem(`factureman_${userId}_profile`, JSON.stringify(newProfile));
+                addNotification({
+                  type: 'success',
+                  title: 'Crédits Reçus',
+                  message: `Votre solde a été mis à jour : ${newProfile.app_credits} crédits disponibles.`
+                });
+              } catch (e) {
+                console.error('Error processing realtime update:', e);
+              }
+            }
+          )
+          .subscribe();
+      } catch (e) {
+        console.error('🚨 Error setting up realtime channel:', e);
+      }
 
       // 3. INITIAL ALERTS CHECK (Delayed to allow state hydration)
       setTimeout(() => {
@@ -235,11 +265,21 @@ const App: React.FC = () => {
       }, 3000);
 
       // Check onboarding status
-      const hasSeen = localStorage.getItem('has_seen_onboarding');
-      if (!hasSeen) setShowOnboarding(true);
+      try {
+        const hasSeen = localStorage.getItem('has_seen_onboarding');
+        if (!hasSeen) setShowOnboarding(true);
+      } catch (e) {
+        console.error('Error checking onboarding:', e);
+      }
 
       return () => {
-        channel.unsubscribe();
+        if (channel) {
+          try {
+            channel.unsubscribe();
+          } catch (e) {
+            console.error('Error unsubscribing channel:', e);
+          }
+        }
       };
     }
   }, [session, products, walletCredits, credits]);
