@@ -37,17 +37,21 @@ const ChangePasswordModal: React.FC<Props> = ({ onClose }) => {
 
             if (error) throw error;
 
-            // Success
-
-            // Claim Welcome Bonus (New Logic: Only after verified + password set)
-            const { error: bonusError } = await supabase.rpc('claim_welcome_bonus');
-            if (bonusError) console.error("Bonus Error:", bonusError);
+            // Success - Bonus is now handled by DB trigger on signup, 
+            // so we don't need to call rpc('claim_welcome_bonus') here anymore.
 
             localStorage.removeItem('reset_mode');
             onClose();
 
         } catch (err: any) {
             console.error(err);
+            if (err.name === 'AbortError') {
+                // Ignore abort errors which can happen if component unmounts or multiple requests
+                return;
+            }
+            if (err.message?.includes('signal is aborted')) {
+                return; // Ignore signal aborted
+            }
             setError(err.message || "Erreur lors de la mise à jour.");
         } finally {
             setLoading(false);
