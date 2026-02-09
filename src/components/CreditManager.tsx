@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CreditRecord, DocumentType } from '../types';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDateSafe } from '../utils/format';
 import {
   Search, User, Wallet, ChevronRight, ArrowUpRight,
   ArrowDownLeft, Plus, X, Calendar, Printer, MessageCircle,
@@ -419,7 +419,7 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
                       </div>
                       <div>
                         <p className="text-xs font-black text-gray-900 uppercase">{p.customerName}</p>
-                        <p className="text-[9px] text-gray-400 font-bold">{new Date(p.date).toLocaleString()}</p>
+                        <p className="text-[9px] text-gray-400 font-bold">{formatDateSafe(p.date)}</p>
                       </div>
                     </div>
                     <p className="font-black text-emerald-600 text-sm">+{formatCurrency(p.amount)} F</p>
@@ -488,7 +488,7 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
                         <h4 className={`font-black uppercase text-xs ${appt.completed ? 'line-through text-gray-400' : 'text-indigo-900'}`}>{appt.customerName}</h4>
                         {new Date(appt.date) < new Date() && !appt.completed && <span className="bg-red-100 text-red-600 text-[8px] px-1 rounded font-bold">EN RETARD</span>}
                       </div>
-                      <p className="text-[10px] font-bold text-gray-500">{new Date(appt.date).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-[10px] font-bold text-gray-500">{formatDateSafe(appt.date, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                       {appt.note && <p className="text-[9px] italic text-gray-400 mt-1">"{appt.note}"</p>}
                     </div>
                   </div>
@@ -555,7 +555,7 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
                   <button
                     key={credit.id}
                     onClick={() => {
-                      window.history.pushState({ step: 'CREDIT', customerDetail: true }, '');
+                      window.history.pushState({ step: 'CREDIT', customerDetail: true, level: 'app' }, '');
                       setSelectedCustomer(credit);
                     }}
                     className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between hover:border-blue-300 transition-all active:scale-98 group"
@@ -599,12 +599,12 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
                     <div>
                       <p className="text-xs font-black text-gray-900 uppercase">{p.customerName}</p>
                       <p className="text-[9px] text-gray-400 font-bold">
-                        {new Date(p.date).toLocaleDateString()}
+                        {formatDateSafe(p.date, { dateStyle: 'short' })}
                         {/* @ts-ignore */}
                         {p.createdAt && (
                           <span className="text-gray-300 ml-1">
                             {/* @ts-ignore */}
-                            {new Date(p.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {formatDateSafe(p.createdAt, { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         )}
                       </p>
@@ -755,7 +755,7 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
                         <Calendar size={18} />
                       </div>
                       <div>
-                        <p className="text-[10px] font-black text-indigo-900 uppercase">{new Date(apt.date).toLocaleString()}</p>
+                        <p className="text-[10px] font-black text-indigo-900 uppercase">{formatDateSafe(apt.date)}</p>
                         <p className="text-[9px] text-indigo-500 font-bold">{apt.note || 'Pas de note'}</p>
                       </div>
                     </div>
@@ -788,12 +788,12 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
                     <div>
                       <p className="text-[10px] font-black text-gray-900 uppercase truncate max-w-[150px]">{h.description}</p>
                       <p className="text-[9px] text-gray-400 font-bold">
-                        {new Date(h.date).toLocaleDateString()}
+                        {formatDateSafe(h.date, { dateStyle: 'short' })}
                         {/* @ts-ignore */}
                         {h.createdAt && (
                           <span className="text-gray-300 ml-1">
                             {/* @ts-ignore */}
-                            {new Date(h.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {formatDateSafe(h.createdAt, { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         )}
                       </p>
@@ -917,7 +917,7 @@ const CreditManager: React.FC<Props> = ({ credits, onAddPayment, onGenerateRecei
                   <span className="italic">{selectedContractInvoice.description}</span>
                 </p>
                 <div className="my-8 text-right">
-                  <p className="mb-8">Fait le {new Date(selectedContractInvoice.date).toLocaleDateString()}, à Bamako.</p>
+                  <p className="mb-8">Fait le {formatDateSafe(selectedContractInvoice.date, { dateStyle: 'long' })}, à Bamako.</p>
                   <div className="border border-dashed border-gray-400 h-24 w-40 ml-auto flex items-center justify-center bg-gray-50 text-gray-400 text-xs">
                     Signature & Cachet
                   </div>

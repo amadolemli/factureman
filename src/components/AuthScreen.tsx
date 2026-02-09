@@ -309,7 +309,7 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                 phone: finalPhone,
                 options: {
                     data: {
-                        referral_code: referralCode
+                        referral_code: (referralCode || '').trim()
                     }
                 }
             });
@@ -317,8 +317,9 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
             if (error) throw error;
             setStep('REGISTER_OTP'); // Move to verify
         } catch (err: any) {
-            console.error(err);
-            setError(err.message || "Erreur d'envoi du code.");
+            console.error("Register Error:", err);
+            const errorMsg = err?.message || (typeof err === 'string' ? err : "Erreur d'envoi du code.");
+            setError(errorMsg);
         } finally {
             setLoading(false);
         }

@@ -9,7 +9,7 @@ import { testGeminiConnection } from '../services/geminiService';
 import { testMistralConnection } from '../services/mistralService';
 import { storageService } from '../services/storageService';
 import AdminPanel from './AdminPanel';
-import { StorageDiagnostic } from './StorageDiagnostic';
+
 import { UserProfile } from '../types';
 
 interface Props {
@@ -41,7 +41,7 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
 
   // Signature State
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const [showDiagnostic, setShowDiagnostic] = useState(false);
+
   const sigCanvasRef = useRef<SignatureCanvas | null>(null);
 
   const saveSignature = async () => {
@@ -569,13 +569,7 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
             <p className="text-[10px] text-gray-400 text-center max-w-sm">
               Cette signature sera apposée automatiquement au bas de vos factures et reçus pour les authentifier visuellement.
             </p>
-            {/* Diagnostic Button */}
-            <button
-              onClick={() => setShowDiagnostic(true)}
-              className="mt-3 text-[10px] text-blue-600 hover:text-blue-800 font-bold uppercase tracking-wider underline"
-            >
-              🔧 Problème d'upload ? Lancer le diagnostic
-            </button>
+
           </div>
         </div>
 
@@ -1084,18 +1078,7 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
         </div>
       </div>
 
-      {/* Storage Diagnostic Modal */}
-      {showDiagnostic && (
-        <div className="fixed inset-0 z-[200]">
-          <StorageDiagnostic />
-          <button
-            onClick={() => setShowDiagnostic(false)}
-            className="absolute top-4 right-4 bg-white text-gray-800 px-4 py-2 rounded-xl font-bold text-sm shadow-lg hover:bg-gray-100 z-[201]"
-          >
-            Fermer
-          </button>
-        </div>
-      )}
+
     </div>
   );
 };

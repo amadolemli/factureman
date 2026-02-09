@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { InvoiceData, AppStep, DocumentType, Product, BusinessInfo, CreditRecord, Reminder, UserProfile, CreditHistoryItem } from './types';
 import { DEFAULT_BUSINESS, PRODUCT_CATALOG } from './constants';
-import { generateInvoiceNumber, formatCurrency, generateUUID } from './utils/format';
+import { generateInvoiceNumber, formatCurrency, generateUUID, formatDateSafe } from './utils/format';
 import InvoiceForm from './components/InvoiceForm';
 import InvoicePreview from './components/InvoicePreview';
 import StockManager from './components/StockManager';
@@ -111,7 +111,7 @@ const App: React.FC = () => {
           addNotification({
             type: 'info',
             title: `Rendez-vous : ${client.customerName}`,
-            message: `RDV à ${new Date(appt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. ${appt.note ? `Note: ${appt.note}` : ''}`
+            message: `RDV à ${formatDateSafe(appt.date, { hour: '2-digit', minute: '2-digit' })}. ${appt.note ? `Note: ${appt.note}` : ''}`
           });
 
           // Also trigger browser notification if not already done today
@@ -119,7 +119,7 @@ const App: React.FC = () => {
             const notifiedKey = `notif_done_${appt.id}`;
             if (!localStorage.getItem(notifiedKey)) {
               new Notification(`Rendez-vous : ${client.customerName}`, {
-                body: `Aujourd'hui à ${new Date(appt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+                body: `Aujourd'hui à ${formatDateSafe(appt.date, { hour: '2-digit', minute: '2-digit' })}`,
                 icon: '/pwa-192x192.png',
                 tag: appt.id // Dedup at OS level
               });
@@ -1720,7 +1720,7 @@ const App: React.FC = () => {
                   <div key={rem.id} className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden">
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-[10px] font-black uppercase bg-red-100 text-red-600 px-2 py-1 rounded-lg">
-                        {new Date(rem.date).toLocaleString()}
+                        {formatDateSafe(rem.date)}
                       </span>
                       <button
                         onClick={() => handleDismissReminder(rem.id, rem.clientName)}

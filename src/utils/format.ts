@@ -87,3 +87,14 @@ export const numberToWords = (n: number): string => {
 
   return `${capitalized} Francs CFA`;
 };
+
+export const formatDateSafe = (dateString: string | Date | undefined | null, options?: Intl.DateTimeFormatOptions): string => {
+  if (!dateString) return "Date Invalide";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Date Invalide";
+    return date.toLocaleString('fr-FR', options);
+  } catch (e) {
+    return "Date Invalide";
+  }
+};
