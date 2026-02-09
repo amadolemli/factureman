@@ -63,10 +63,14 @@ export const notificationService = {
                         if (currentScheduled[id]) {
                             // 1. Play Sound (Safe)
                             try {
-                                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                                audio.volume = 0.5;
-                                audio.play().catch(() => { }); // Ignore play errors (autoplay policy)
-                            } catch (e) { }
+                                if (typeof Audio !== "undefined") {
+                                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                                    audio.volume = 0.5;
+                                    audio.play().catch(e => console.warn("Audio play blocked", e));
+                                }
+                            } catch (e) {
+                                console.warn("Audio error", e);
+                            }
 
                             // 2. Show Notification (Safe)
                             try {

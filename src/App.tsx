@@ -447,8 +447,12 @@ const App: React.FC = () => {
   useEffect(() => {
     const key = getStorageKey('inventory');
     if (key) {
-      localStorage.setItem(key, JSON.stringify(products));
-      console.log('💾 Products saved to localStorage:', products.length);
+      try {
+        localStorage.setItem(key, JSON.stringify(products));
+        console.log('💾 Products saved to localStorage:', products.length);
+      } catch (e) {
+        console.error('LocalStorage Quota Exceeded (Products)', e);
+      }
     }
     if (session?.user?.id && products.length > 0) {
       console.log('📤 Saving products to cloud...', products.length);
@@ -462,13 +466,21 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const key = getStorageKey('history');
-    if (key) localStorage.setItem(key, JSON.stringify(history));
+    try {
+      if (key) localStorage.setItem(key, JSON.stringify(history));
+    } catch (e) {
+      console.error('LocalStorage Quota Exceeded (History)', e);
+    }
     if (session?.user?.id) dataSyncService.saveInvoices(history, session.user.id);
   }, [history, session]);
 
   useEffect(() => {
     const key = getStorageKey('credits');
-    if (key) localStorage.setItem(key, JSON.stringify(credits));
+    try {
+      if (key) localStorage.setItem(key, JSON.stringify(credits));
+    } catch (e) {
+      console.error('LocalStorage Quota Exceeded (Credits)', e);
+    }
     if (session?.user?.id) dataSyncService.saveCreditRecords(credits, session.user.id);
   }, [credits, session]);
 
@@ -601,7 +613,7 @@ const App: React.FC = () => {
             margin: 0,
             filename: `DOC_${backgroundPdfDoc.number}.pdf`,
             image: { type: 'jpeg' as const, quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
+            html2canvas: { scale: window.innerWidth < 768 ? 1 : 2, useCORS: true },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
           };
 
