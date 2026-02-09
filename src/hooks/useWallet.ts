@@ -13,11 +13,18 @@ export const useWallet = (
     // Wrapper to persist wallet
     const setWalletCredits = (newAmount: number | ((prev: number) => number)) => {
         setWalletCreditsState(prev => {
-            const value = typeof newAmount === 'function' ? newAmount(prev) : newAmount;
-            if (session?.user?.id) {
+            let value;
+            if (typeof newAmount === 'function') {
+                value = (newAmount as (prev: number) => number)(prev);
+            } else {
+                value = newAmount;
+            }
+
+            // Defensive check before saving
+            if (session?.user?.id && value != null && !isNaN(value)) {
                 localStorage.setItem(`factureman_${session.user.id}_wallet`, value.toString());
             }
-            return value;
+            return value || 0;
         });
     };
 
