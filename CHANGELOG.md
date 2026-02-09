@@ -1,3 +1,75 @@
+# 🎯 CHANGELOG - Session 2026-02-09
+
+## 📋 RÉSUMÉ DES CHANGEMENTS
+
+### ✅ Correctifs Critiques
+
+1.  **Mobile Blank Page Fix** 📱
+    *   **Problème** : L'application crashait sur Android (Page Blanche) au démarrage.
+    *   **Cause** : Utilisation du constructeur `new Notification()` qui est illégal sur Chrome Android en mode PWA.
+    *   **Solution** : Remplacement par `ServiceWorkerRegistration.showNotification()` et ajout de blocs `try-catch` défensifs.
+    *   **Sécurité** : Ajout d'un `ErrorBoundary` global pour empêcher tout crash futur de bloquer l'application.
+
+2.  **Anti-Fraud Bonus System** 🛡️
+    *   **Problème** : Les utilisateurs recevaient 500 crédits dès l'inscription, permettant la fraude par réinstallation.
+    *   **Solution** :
+        *   Nouveaux utilisateurs commencent à **0 crédits**.
+        *   Le bonus de 500 crédits n'est débloqué qu'après **création d'un mot de passe**.
+        *   Ajout colonne `bonuses_claimed` pour empêcher les réclamations multiples.
+    *   **Fichiers** : `fix_bonus_logic.sql` (Backend), `ChangePasswordModal.tsx` (Frontend).
+
+3.  **Mobile Diagnostics Tools** 🔧
+    *   Ajout d'une page cachée `/diagnostics` pour visualiser les logs d'erreurs sur mobile.
+    *   Capture automatique des erreurs console et React dans le localStorage.
+
+---
+
+### 🔧 FICHIERS MODIFIÉS
+
+#### Code Source
+*   `src/App.tsx` - Fix Notification crash + Intégration Diagnostics
+*   `src/main.tsx` - Ajout ErrorBoundary
+*   `src/components/ErrorBoundary.tsx` - **NEW** - Capture d'erreurs global
+*   `src/components/DiagnosticsPage.tsx` - **NEW** - Visualiseur de logs mobile
+*   `src/utils/mobileLogger.ts` - **NEW** - Logger persistant
+*   `src/components/ChangePasswordModal.tsx` - Appel `claim_welcome_bonus` après mot de passe
+
+#### Scripts SQL
+*   `fix_bonus_logic.sql` - Logique 0 crédits départ + Claim RPC
+
+---
+
+## ✅ TESTS EFFECTUÉS
+
+### Build
+```bash
+npm run build
+✓ built in 1m 22s
+```
+**Status** : ✅ SUCCESS
+
+### Fonctionnalités
+*   ✅ App mobile ne crash plus (Page Blanche résolue)
+*   ✅ Bonus bloqué à l'inscription (0 crédits)
+*   ✅ Bonus débloqué après mot de passe (testé via RPC)
+*   ✅ Diagnostics accessibles via /diagnostics
+
+---
+
+## ⚠️ ACTIONS REQUISES
+
+### Pour l'utilisateur (Déjà fait ✅)
+1.  **Exécuter SQL** : `fix_bonus_logic.sql` sur Supabase.
+
+---
+
+## 📌 VERSION
+**Version** : 2.2.0
+**Date** : 2026-02-09
+**Status** : ✅ Production Ready
+
+---
+
 # 🎯 CHANGELOG - Session 2026-02-06
 
 ## 📋 RÉSUMÉ DES CHANGEMENTS
