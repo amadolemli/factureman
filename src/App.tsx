@@ -34,6 +34,8 @@ import NotificationCenter, { AppNotification } from './components/NotificationCe
 import { VerifyDocument } from './components/VerifyDocument';
 import DiagnosticsPage from './components/DiagnosticsPage';
 
+import { PullToRefresh } from './components/PullToRefresh';
+
 const App: React.FC = () => {
   // ROUTING HACK: Simple manual routing for Verification Page
   if (window.location.pathname.startsWith('/verify')) {
@@ -220,6 +222,9 @@ const App: React.FC = () => {
   useEffect(() => {
     if (session?.user) {
       const userId = session.user.id;
+
+      // Clean Trash on Load
+      dataSyncService.cleanTrash();
 
       // 0. LOAD LOCAL DATA
       try {
@@ -1298,6 +1303,134 @@ const App: React.FC = () => {
 
 
 
+
+
+  // --- TRASH & DELETION LOGIC ---
+
+  const handleSoftDeleteInvoice = (id: string) => {
+    const inv = history.find(i => i.id === id);
+    if (!inv) return;
+
+    // 1. Revert Stock (If finalized and not a receipt)
+    if (inv.isFinalized && inv.type !== DocumentType.RECEIPT) {
+      setProducts(prev => prev.map(p => {
+        // Try to find matching item by name or ID (fallback to name as common link)
+        const item = inv.items.find(i => i.description === p.name);
+        if (item) {
+          return { ...p, stock: p.stock + item.quantity };
+        }
+        return p;
+      }));
+    }
+
+    // 2. Revert Client Balance (If finalized)
+    if (inv.isFinalized) {
+      let adjustment = 0;
+
+      if (inv.type === DocumentType.RECEIPT) {
+        // Receipt (Payment) deleted -> Debt increases (Balance + Amount)
+        adjustment = inv.amountPaid || 0;
+      } else {
+        // Invoice deleted -> Debt decreases (Balance - Unpaid Amount)
+        const total = inv.items.reduce((s, i) => s + (i.quantity * i.unitPrice), 0);
+        const unpaid = total - (inv.amountPaid || 0);
+        adjustment = -unpaid;
+      }
+
+      if (adjustment !== 0) {
+        setCredits(prev => prev.map(c => {
+          // Normalized comparison
+          if (c.customerName.trim().toLowerCase() === inv.customerName.trim().toLowerCase()) {
+            return {
+              ...c,
+              remainingBalance: c.remainingBalance + adjustment,
+              history: [...c.history, {
+                type: adjustment > 0 ? 'INVOICE' : 'PAYMENT', // Visual correction
+                id: `trash-rev-${Date.now()}`,
+                date: new Date().toISOString(),
+                amount: Math.abs(adjustment),
+                description: `Annulation ${inv.type} ${inv.number} (Corbeille)`
+              }]
+            };
+          }
+          return c;
+        }));
+      }
+    }
+
+    // 3. Mark as Deleted
+    setHistory(prev => prev.map(i => i.id === id ? { ...i, deletedAt: new Date().toISOString() } : i));
+    addNotification({ type: 'success', title: 'Mis à la corbeille', message: 'Document supprimé provisoirment.' });
+  };
+
+  const handleRestoreInvoice = (id: string) => {
+    const inv = history.find(i => i.id === id);
+    if (!inv) return;
+
+    // 1. Re-Apply Stock Deduction
+    if (inv.isFinalized && inv.type !== DocumentType.RECEIPT) {
+      setProducts(prev => prev.map(p => {
+        const item = inv.items.find(i => i.description === p.name);
+        if (item) {
+          // Ensure we don't go negative? Or allow it? Allowing it for consistency.
+          return { ...p, stock: p.stock - item.quantity };
+        }
+        return p;
+      }));
+    }
+
+    // 2. Re-Apply Client Balance
+    if (inv.isFinalized) {
+      let adjustment = 0;
+      if (inv.type === DocumentType.RECEIPT) {
+        // Receipt restored -> Debt decreases
+        adjustment = -(inv.amountPaid || 0);
+      } else {
+        // Invoice restored -> Debt increases
+        const total = inv.items.reduce((s, i) => s + (i.quantity * i.unitPrice), 0);
+        const unpaid = total - (inv.amountPaid || 0);
+        adjustment = unpaid;
+      }
+
+      if (adjustment !== 0) {
+        setCredits(prev => prev.map(c => {
+          if (c.customerName.trim().toLowerCase() === inv.customerName.trim().toLowerCase()) {
+            return {
+              ...c,
+              remainingBalance: c.remainingBalance + adjustment,
+              history: [...c.history, {
+                type: adjustment > 0 ? 'INVOICE' : 'PAYMENT',
+                id: `trash-rest-${Date.now()}`,
+                date: new Date().toISOString(),
+                amount: Math.abs(adjustment),
+                description: `Restauration ${inv.type} ${inv.number}`
+              }]
+            };
+          }
+          return c;
+        }));
+      }
+    }
+
+    // 3. Unmark
+    setHistory(prev => prev.map(i => i.id === id ? { ...i, deletedAt: undefined } : i));
+    addNotification({ type: 'success', title: 'Document Restauré', message: 'Le document est de nouveau actif.' });
+  };
+
+  const handlePermanentDeleteInvoice = (id: string) => {
+    const inv = history.find(i => i.id === id);
+    if (inv && inv.pdfUrl) {
+      // Fire and forget storage deletion: Extract path after bucket name
+      const pathParts = inv.pdfUrl.split('/invoices/');
+      if (pathParts.length > 1) {
+        const filePath = pathParts[1];
+        storageService.deleteFile('invoices', filePath).catch(err => console.error("Error deleting file:", err));
+      }
+    }
+    setHistory(prev => prev.filter(i => i.id !== id));
+    addNotification({ type: 'success', title: 'Suppression Définitive', message: 'Document effacé à jamais.' });
+  };
+
   const resetInvoice = (navigateToForm = true) => {
     setInvoiceData({
       id: generateUUID(),
@@ -1656,10 +1789,11 @@ const App: React.FC = () => {
   }
   if (!session) {
     return <LandingPage onLogin={() => { }} />;
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="bg-gray-50 min-h-screen pb-20 md:pb-0 font-sans text-gray-900 selection:bg-blue-100 selection:text-blue-900">
+      <PullToRefresh />
       <input type="file" ref={fileInputRef} onChange={handleScan} accept="image/*,application/pdf" className="hidden" />
 
       {/* HEADER */}
@@ -1843,7 +1977,9 @@ const App: React.FC = () => {
           <HistoryManager
             history={history}
             onView={(doc) => { setInvoiceData(doc); goToStep(AppStep.PREVIEW); }}
-            onDelete={(id) => setHistory(h => h.filter(i => i.id !== id))}
+            onDelete={handleSoftDeleteInvoice}
+            onRestore={handleRestoreInvoice}
+            onPermanentDelete={handlePermanentDeleteInvoice}
             onShare={handleShareWhatsApp}
             onConvert={handleConvertDocument}
           />

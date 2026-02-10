@@ -37,6 +37,7 @@ export interface Product {
   defaultPrice: number;
   stock: number;
   category?: string;
+  deletedAt?: string;
 }
 
 export interface InvoiceItem {
@@ -96,6 +97,7 @@ export interface InvoiceData {
   clientBalanceSnapshot?: number;
   createdAt?: string; // ISO String timestamp of creation
   pdfUrl?: string; // NEW: Cloud Storage URL for the generated PDF
+  deletedAt?: string; // NEW: Soft Delete Timestamp
 }
 
 export enum AppStep {

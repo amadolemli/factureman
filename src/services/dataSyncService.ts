@@ -38,7 +38,8 @@ export const dataSyncService = {
                 name: p.name,
                 defaultPrice: p.price,
                 stock: p.stock,
-                category: p.category
+                category: p.category,
+                deletedAt: p.deleted_at // Map FROM DB
             }));
 
             // Invoices
@@ -67,7 +68,8 @@ export const dataSyncService = {
                     creditConfirmed: inv.status === 'CONFIRMED',
                     clientBalanceSnapshot: content.clientBalanceSnapshot,
                     createdAt: content.createdAt || inv.created_at, // Fallback to DB timestamp if avail
-                    pdfUrl: inv.pdf_url // MAP FROM DB COLUMN
+                    pdfUrl: inv.pdf_url, // MAP FROM DB COLUMN
+                    deletedAt: inv.deleted_at // Map FROM DB
                 };
             });
 
@@ -105,7 +107,8 @@ export const dataSyncService = {
             name: p.name,
             price: p.defaultPrice,
             stock: p.stock,
-            category: p.category
+            category: p.category,
+            deleted_at: p.deletedAt || null
         }));
         const { error } = await supabase.from('products').upsert(dbProducts);
         if (error) console.error('Error saving products:', error);
@@ -144,7 +147,8 @@ export const dataSyncService = {
             amount_paid: inv.amountPaid,
             status: inv.creditConfirmed ? 'CONFIRMED' : 'PENDING',
             content: cleanContent, // SAVE Cleaned OBJECT
-            pdf_url: inv.pdfUrl || null // Sync the PDF URL column
+            pdf_url: inv.pdfUrl || null, // Sync the PDF URL column
+            deleted_at: inv.deletedAt || null
         };
     },
 
@@ -219,6 +223,17 @@ export const dataSyncService = {
         } catch (error) {
             console.error("Auto-Sync Failed:", error);
             return { success: false, reason: 'error' };
+        }
+    },
+
+    // --- TRASH CLEANUP ---
+    async cleanTrash() {
+        try {
+            const { error } = await supabase.rpc('empty_trash');
+            if (error) console.error("Trash Cleanup Failed:", error);
+            else console.log("Trash Cleaned (Items > 30 days removed)");
+        } catch (err) {
+            console.error("Trash Cleanup Exception:", err);
         }
     }
 };

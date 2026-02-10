@@ -14,12 +14,15 @@ interface Props {
   onDelete: (id: string) => void;
   onShare: (invoice: InvoiceData) => void;
   onConvert: (invoice: InvoiceData, newType: DocumentType) => void;
+  onRestore: (id: string) => void;
+  onPermanentDelete: (id: string) => void;
 }
 
-const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, onConvert }) => {
+const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, onConvert, onRestore, onPermanentDelete }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<DocumentType | 'ALL'>('ALL');
   const [activeConvertId, setActiveConvertId] = useState<string | null>(null);
+  const [isTrashView, setIsTrashView] = useState(false); // Toggle for Trash View
 
   // Helper to safely format date for search comparison
   const formatDateForSearch = (isoString: string) => {
@@ -32,6 +35,13 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
 
   const filteredHistory = history
     .filter(item => {
+      // TRASH FILTER: Show only deleted if isTrashView, else show non-deleted
+      if (isTrashView) {
+        if (!item.deletedAt) return false;
+      } else {
+        if (item.deletedAt) return false;
+      }
+
       const term = searchTerm.toLowerCase();
       const total = item.items.reduce((acc, i) => acc + (i.quantity * i.unitPrice), 0).toString();
 
@@ -68,15 +78,33 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 sticky top-0 z-30">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="bg-blue-900 p-2 rounded-lg">
-            <Clock className="text-white" size={20} />
+      <div className={`bg-white p-4 rounded-2xl shadow-sm border ${isTrashView ? 'border-red-200 bg-red-50' : 'border-gray-200'} sticky top-0 z-30 transition-colors`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`${isTrashView ? 'bg-red-600' : 'bg-blue-900'} p-2 rounded-lg transition-colors`}>
+              {isTrashView ? <Trash2 className="text-white" size={20} /> : <Clock className="text-white" size={20} />}
+            </div>
+            <div>
+              <h2 className={`text-xl font-black ${isTrashView ? 'text-red-900' : 'text-gray-900'}`}>
+                {isTrashView ? 'Corbeille' : 'Historique'}
+              </h2>
+              <p className={`text-xs font-bold uppercase tracking-widest ${isTrashView ? 'text-red-400' : 'text-gray-500'}`}>
+                {isTrashView ? 'Éléments supprimés' : 'Registre des documents'}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-black text-gray-900">Historique</h2>
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Registre des documents</p>
-          </div>
+
+          <button
+            onClick={() => setIsTrashView(!isTrashView)}
+            className={`p-2 rounded-xl transition-all flex items-center gap-2 font-bold text-xs uppercase ${isTrashView
+              ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              : 'bg-red-100 text-red-600 hover:bg-red-200'
+              }`}
+            title={isTrashView ? "Retour à l'historique" : "Voir la corbeille"}
+          >
+            {isTrashView ? <Clock size={16} /> : <Trash2 size={16} />}
+            <span className="hidden sm:inline">{isTrashView ? 'Historique' : 'Corbeille'}</span>
+          </button>
         </div>
 
         <div className="relative mb-4">
@@ -84,7 +112,7 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
           <input
             type="text"
             placeholder="Client, N°, Tél, Date..."
-            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-sm"
+            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -94,7 +122,7 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
           <button
             onClick={() => setFilterType('ALL')}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase whitespace-nowrap transition-colors border ${filterType === 'ALL'
-              ? 'bg-blue-900 text-white border-blue-900'
+              ? (isTrashView ? 'bg-red-600 text-white border-red-600' : 'bg-blue-900 text-white border-blue-900')
               : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
               }`}
           >
@@ -108,7 +136,7 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
                 ? getBadgeColors(type).replace('bg-', 'bg-opacity-100 bg-').replace('text-', 'text-white text-').split(' ')[0] + ' text-white border-transparent'
                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                 }`}
-              style={filterType === type ? { backgroundColor: type === DocumentType.RECEIPT ? '#16a34a' : 'rgb(30, 58, 138)' } : {}}
+              style={filterType === type ? { backgroundColor: type === DocumentType.RECEIPT ? '#16a34a' : (isTrashView ? '#dc2626' : 'rgb(30, 58, 138)') } : {}}
             >
               {type}
             </button>
@@ -125,10 +153,10 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
             const isReceipt = item.type === DocumentType.RECEIPT;
 
             return (
-              <div key={item.id} className={`bg-white rounded-2xl border shadow-sm group hover:border-blue-300 transition-all ${isUnpaid ? 'border-orange-200' : 'border-gray-100'}`}>
+              <div key={item.id} className={`bg-white rounded-2xl border shadow-sm group hover:border-blue-300 transition-all ${isTrashView ? 'opacity-80 hover:opacity-100 border-red-100' : (isUnpaid ? 'border-orange-200' : 'border-gray-100')}`}>
                 <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
                   <div className="flex items-center gap-4 w-full sm:w-auto">
-                    <div className={`p-3 rounded-xl border ${getBadgeColors(item.type)}`}>
+                    <div className={`p-3 rounded-xl border ${getBadgeColors(item.type)} ${isTrashView ? 'grayscale' : ''}`}>
                       {isReceipt ? <Receipt size={24} /> : <FileText size={24} />}
                     </div>
                     <div>
@@ -137,11 +165,16 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
                         <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full border uppercase ${getBadgeColors(item.type)}`}>
                           {item.type}
                         </span>
-                        {isUnpaid ? (
+                        {isTrashView && (
+                          <span className="flex items-center gap-0.5 text-[7px] font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full border border-red-100 uppercase">
+                            <Trash2 size={8} /> Supprimé
+                          </span>
+                        )}
+                        {!isTrashView && isUnpaid ? (
                           <span className="flex items-center gap-0.5 text-[7px] font-black text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100 uppercase">
                             <AlertCircle size={8} /> Impayé
                           </span>
-                        ) : !isReceipt && (
+                        ) : !isTrashView && !isReceipt && (
                           <span className="flex items-center gap-0.5 text-[7px] font-black text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full border border-green-100 uppercase">
                             <CheckCircle2 size={8} /> Payé
                           </span>
@@ -154,13 +187,8 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
                         <span className="flex items-center gap-1 text-[9px] text-gray-400 font-bold uppercase tracking-tighter">
                           <Calendar size={10} />
                           {new Date(item.date).toLocaleDateString('fr-FR')}
-                          {item.createdAt && (
-                            <span className="text-gray-300 ml-1">
-                              {new Date(item.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
                         </span>
-                        <span className={`font-black text-xs ${isReceipt ? 'text-green-600' : 'text-blue-900'}`}>
+                        <span className={`font-black text-xs ${isTrashView ? 'text-gray-500 line-through' : (isReceipt ? 'text-green-600' : 'text-blue-900')}`}>
                           {formatCurrency(isReceipt ? paid : total)} F
                         </span>
                       </div>
@@ -168,61 +196,78 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 border-gray-50 pt-3 sm:pt-0">
-                    <button
-                      onClick={() => onShare(item)}
-                      className="p-2.5 text-[#25D366] hover:bg-green-50 rounded-xl transition-colors active:scale-90"
-                      title="Partager WhatsApp"
-                    >
-                      <MessageCircle size={18} />
-                    </button>
-
-                    {!isReceipt && (
-                      <div className="relative">
+                    {isTrashView ? (
+                      /* TRASH ACTIONS */
+                      <>
                         <button
-                          onClick={() => setActiveConvertId(activeConvertId === item.id ? null : item.id)}
-                          className={`p-2.5 rounded-xl transition-all ${activeConvertId === item.id ? 'bg-blue-600 text-white' : 'text-blue-400 hover:bg-blue-50'}`}
-                          title="Convertir"
+                          onClick={() => onRestore(item.id)}
+                          className="px-3 py-2 bg-green-50 text-green-600 hover:bg-green-100 rounded-xl transition-colors active:scale-90 flex items-center gap-1 text-[10px] font-bold uppercase"
+                          title="Restaurer"
                         >
-                          <CopyPlus size={18} />
+                          <Clock size={16} /> Restaurer
+                        </button>
+                      </>
+                    ) : (
+                      /* NORMAL ACTIONS */
+                      <>
+                        <button
+                          onClick={() => onShare(item)}
+                          className="p-2.5 text-[#25D366] hover:bg-green-50 rounded-xl transition-colors active:scale-90"
+                          title="Partager WhatsApp"
+                        >
+                          <MessageCircle size={18} />
                         </button>
 
-                        {activeConvertId === item.id && (
-                          <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl z-20 p-2 w-48 animate-in zoom-in duration-200">
-                            <div className="flex justify-between items-center px-2 py-1 mb-1 border-b">
-                              <span className="text-[8px] font-black uppercase text-gray-400">Convertir vers :</span>
-                              <button onClick={() => setActiveConvertId(null)}><X size={12} /></button>
-                            </div>
-                            {Object.values(DocumentType).filter(t => t !== item.type && t !== DocumentType.RECEIPT).map(type => (
-                              <button
-                                key={type}
-                                onClick={() => {
-                                  onConvert(item, type);
-                                  setActiveConvertId(null);
-                                }}
-                                className="w-full text-left p-2 hover:bg-blue-50 text-[9px] font-black text-blue-900 rounded-lg flex items-center justify-between"
-                              >
-                                {type} <ChevronRight size={12} />
-                              </button>
-                            ))}
+                        {!isReceipt && (
+                          <div className="relative">
+                            <button
+                              onClick={() => setActiveConvertId(activeConvertId === item.id ? null : item.id)}
+                              className={`p-2.5 rounded-xl transition-all ${activeConvertId === item.id ? 'bg-blue-600 text-white' : 'text-blue-400 hover:bg-blue-50'}`}
+                              title="Convertir"
+                            >
+                              <CopyPlus size={18} />
+                            </button>
+
+                            {activeConvertId === item.id && (
+                              <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl z-20 p-2 w-48 animate-in zoom-in duration-200">
+                                <div className="flex justify-between items-center px-2 py-1 mb-1 border-b">
+                                  <span className="text-[8px] font-black uppercase text-gray-400">Convertir vers :</span>
+                                  <button onClick={() => setActiveConvertId(null)}><X size={12} /></button>
+                                </div>
+                                {Object.values(DocumentType).filter(t => t !== item.type && t !== DocumentType.RECEIPT).map(type => (
+                                  <button
+                                    key={type}
+                                    onClick={() => {
+                                      onConvert(item, type);
+                                      setActiveConvertId(null);
+                                    }}
+                                    className="w-full text-left p-2 hover:bg-blue-50 text-[9px] font-black text-blue-900 rounded-lg flex items-center justify-between"
+                                  >
+                                    {type} <ChevronRight size={12} />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
-                      </div>
+
+                        <button
+                          onClick={() => onView(item)}
+                          className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors active:scale-90"
+                          title="Ouvrir"
+                        >
+                          <Eye size={20} />
+                        </button>
+
+                        <button
+                          onClick={() => { if (confirm("Mettre ce document à la corbeille ? (Les stocks et soldes seront rétablis)")) onDelete(item.id); }}
+                          className="p-2.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors active:scale-90"
+                          title="Mettre à la corbeille"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </>
                     )}
-
-                    <button
-                      onClick={() => onView(item)}
-                      className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors active:scale-90"
-                      title="Ouvrir"
-                    >
-                      <Eye size={20} />
-                    </button>
-
-                    <button
-                      onClick={() => { if (confirm("Supprimer ce document de l'historique ?")) onDelete(item.id); }}
-                      className="p-2.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors active:scale-90"
-                    >
-                      <Trash2 size={18} />
-                    </button>
                   </div>
                 </div>
               </div>
@@ -230,10 +275,12 @@ const HistoryManager: React.FC<Props> = ({ history, onView, onDelete, onShare, o
           })
         ) : (
           <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-gray-100">
-            <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Clock size={32} className="text-gray-200" />
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isTrashView ? 'bg-red-50' : 'bg-gray-50'}`}>
+              {isTrashView ? <Trash2 size={32} className="text-red-200" /> : <Clock size={32} className="text-gray-200" />}
             </div>
-            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Historique vide</p>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
+              {isTrashView ? 'Corbeille vide' : 'Historique vide'}
+            </p>
           </div>
         )}
       </div>

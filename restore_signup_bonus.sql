@@ -1,6 +1,7 @@
 -- RESTORE IMMEDIATE SIGNUP BONUS
 -- Ensures users get 500 credits immediately upon signup
 -- Also rewards the referrer immediately if a code is provided
+-- (Robust Logic Update: Fixes signal aborted errors on referral)
 
 -- 1. Ensure required columns exist
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_code text;
@@ -18,7 +19,7 @@ BEGIN
 END;
 $$;
 
--- 3. UPDATED TRIGGER: Immediate Reward
+-- 3. UPDATED TRIGGER: Immediate Reward (ROBUST VERSION)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -35,19 +36,32 @@ BEGIN
   -- Check for Referrer Code (handle empty string as NULL)
   input_code := NULLIF(TRIM(new.raw_user_meta_data->>'referral_code'), '');
 
-  -- Find referrer if code provided
-  IF input_code IS NOT NULL THEN
-    SELECT id INTO referrer_id
-    FROM public.profiles
-    WHERE referral_code = upper(input_code);
-  END IF;
+  -- Safely Process Referral with Exception Handling
+  BEGIN
+    IF input_code IS NOT NULL THEN
+      -- Attempt to find referrer
+      SELECT id INTO referrer_id
+      FROM public.profiles
+      WHERE referral_code = upper(input_code);
 
-  -- IMMEDIATE REWARD 1: Give Referral Bonus to REFERRER (if exists)
-  IF referrer_id IS NOT NULL THEN
-    UPDATE public.profiles
-    SET app_credits = app_credits + 500
-    WHERE id = referrer_id;
-  END IF;
+      -- Sanity Check (Prevent self-referral loop just in case)
+      IF referrer_id = new.id THEN
+        referrer_id := NULL;
+      END IF;
+
+      -- IMMEDIATE REWARD 1: Give Referral Bonus to REFERRER (if exists)
+      IF referrer_id IS NOT NULL THEN
+        UPDATE public.profiles
+        SET app_credits = app_credits + 500
+        WHERE id = referrer_id;
+      END IF;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    -- Swallow error to prevent signup failure
+    -- We log a warning so it can be seen in Postgres logs, but we do NOT stop the signup
+    RAISE WARNING 'Referral processing error: %', SQLERRM;
+    referrer_id := NULL;
+  END;
 
   -- IMMEDIATE REWARD 2: Insert New User Profile with 500 Credits
   INSERT INTO public.profiles (
@@ -59,12 +73,12 @@ BEGIN
       bonuses_claimed
   )
   VALUES (
-    new.id, 
-    'Ma Nouvelle Boutique', 
-    500,  -- 500 Credits IMMEDIATELY
-    ref_code,
-    referrer_id,
-    true -- Mark as claimed to prevent future double claiming
+      new.id, 
+      'Ma Nouvelle Boutique', 
+      500,  -- 500 Credits IMMEDIATELY
+      ref_code,
+      referrer_id,
+      true -- Mark as claimed to prevent future double claiming
   );
 
   RETURN new;
