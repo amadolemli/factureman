@@ -1788,7 +1788,13 @@ const App: React.FC = () => {
     );
   }
   if (!session) {
-    return <LandingPage onLogin={() => { }} />;
+    return (
+      <LandingPage
+        onLogin={() => { }}
+        deferredPrompt={deferredPrompt}
+        onInstallApp={handleInstallApp}
+      />
+    );
   };
 
   return (
@@ -2039,6 +2045,8 @@ const App: React.FC = () => {
                 setSyncStatus('error');
               }
             }}
+            onInstallApp={handleInstallApp}
+            canInstallApp={!!deferredPrompt}
           />
         )}
 

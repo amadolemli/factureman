@@ -9,7 +9,6 @@ import { testGeminiConnection } from '../services/geminiService';
 import { testMistralConnection } from '../services/mistralService';
 import { storageService } from '../services/storageService';
 import AdminPanel from './AdminPanel';
-
 import { UserProfile } from '../types';
 
 interface Props {
@@ -26,9 +25,11 @@ interface Props {
   userProfile: UserProfile | null;
   onLogout: () => void;
   onSync: () => void;
+  onInstallApp?: () => void;
+  canInstallApp?: boolean;
 }
 
-const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credits, onUpdateBusiness, onUpdateTemplate, onPreviewDoc, onUpdateClient, onAddClient, creditsCount, userProfile, onLogout, onSync }) => {
+const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credits, onUpdateBusiness, onUpdateTemplate, onPreviewDoc, onUpdateClient, onAddClient, creditsCount, userProfile, onLogout, onSync, onInstallApp, canInstallApp }) => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState<{ name: string; phone: string } | null>(null);
@@ -267,6 +268,33 @@ const ProfileSettings: React.FC<Props> = ({ business, templateId, history, credi
 
       {showAdminPanel && userProfile && (
         <AdminPanel currentUser={userProfile} onClose={() => setShowAdminPanel(false)} />
+      )}
+
+      {/* INSTALL APP SECTION (Visible ONLY if installable) */}
+      {canInstallApp && onInstallApp && (
+        <div className="bg-gradient-to-r from-blue-900 to-indigo-900 p-4 rounded-2xl shadow-lg border border-blue-800 text-white relative overflow-hidden">
+          {/* Decorative Circle */}
+          <div className="absolute top-0 right-0 p-8 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+
+          <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-500/20 p-2 rounded-lg border border-blue-400/30">
+                <Download size={24} className="text-blue-200" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black uppercase">Application Mobile</h2>
+                <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">Installation Rapide</p>
+              </div>
+            </div>
+            <button
+              onClick={onInstallApp}
+              className="px-4 py-2 bg-blue-500 text-white rounded-xl font-bold text-xs uppercase hover:bg-blue-400 transition-colors shadow-lg shadow-blue-900/50 flex items-center gap-2 animate-pulse"
+            >
+              <Download size={16} />
+              Installer
+            </button>
+          </div>
+        </div>
       )}
 
       {/* SECTION SERVICE CLIENT - Visible pour tous */}

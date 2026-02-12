@@ -50,3 +50,5 @@ lerna-debug.log*
 
 # Local development
 *.local
+
+*.timestamp-*

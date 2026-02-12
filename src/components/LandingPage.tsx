@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
     FileText, Package, Wallet, ShieldCheck, ArrowRight, CheckCircle2,
-    BarChart3, Zap, Layout
+    BarChart3, Zap, Layout, Download
 } from 'lucide-react';
 import AuthScreen from './AuthScreen';
 
-const LandingPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
+interface LandingPageProps {
+    onLogin: () => void;
+    deferredPrompt?: any;
+    onInstallApp?: () => void;
+}
+
+const LandingPage: React.FC<LandingPageProps> = ({ onLogin, deferredPrompt, onInstallApp }) => {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [showAuth, setShowAuth] = useState(false);
 
@@ -45,6 +51,12 @@ const LandingPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
         }, 4000);
         return () => clearInterval(timer);
     }, [showAuth]);
+
+    const handleInstallClick = () => {
+        if (deferredPrompt && onInstallApp) {
+            onInstallApp();
+        }
+    };
 
     if (showAuth) {
         return (
@@ -140,6 +152,17 @@ const LandingPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                         Commencer maintenant
                         <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
                     </button>
+
+                    {/* INSTALL BUTTON (Visible ONLY if installable) */}
+                    {deferredPrompt && (
+                        <button
+                            onClick={handleInstallClick}
+                            className="w-full mt-4 bg-emerald-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-emerald-900/50 flex items-center justify-center gap-3 animate-pulse"
+                        >
+                            <Download size={20} />
+                            Télécharger l'application
+                        </button>
+                    )}
 
                     <p className="text-[10px] text-slate-400 font-medium">
                         Gérez tout. Simplement.
