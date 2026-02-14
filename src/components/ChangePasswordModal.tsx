@@ -150,7 +150,7 @@ const ChangePasswordModal: React.FC<Props> = ({ onClose }) => {
                         disabled={loading || !canSubmit}
                         className="w-full py-4 bg-blue-900 hover:bg-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95"
                     >
-                        {loading ? <Loader2 className="animate-spin" size={18} /> : canSubmit ? 'Enregistrer' : 'Mot de passe faible'}
+                        {loading ? <Loader2 className="animate-spin" size={18} /> : <span className="notranslate" translate="no">{canSubmit ? 'Enregistrer' : 'Mot de passe faible'}</span>}
                     </button>
                 </form>
             </div>

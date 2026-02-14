@@ -89,7 +89,7 @@ const PhoneInput = ({
             disabled={loading}
             className="w-full py-4 bg-blue-900 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-800 shadow-xl shadow-blue-200 flex items-center justify-center gap-2 mt-4"
         >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : btnText}
+            {loading ? <Loader2 className="animate-spin" size={18} /> : <span className="notranslate" translate="no">{btnText}</span>}
             {!loading && <ArrowRight size={18} />}
         </button>
         {onBack && (
@@ -131,7 +131,7 @@ const OtpInput = ({ onSubmit, btnText, onBack, otp, setOtp, loading, formattedPh
             disabled={loading || otp.length < 6}
             className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-emerald-500 shadow-xl shadow-emerald-200 flex items-center justify-center gap-2"
         >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : btnText}
+            {loading ? <Loader2 className="animate-spin" size={18} /> : <span className="notranslate" translate="no">{btnText}</span>}
         </button>
         <button
             type="button"
@@ -178,7 +178,7 @@ const PwdInput = ({ onSubmit, btnText, onBack, title, subTitle, password, setPas
                 disabled={loading}
                 className="w-full py-4 bg-blue-900 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-800 shadow-xl shadow-blue-200 flex items-center justify-center gap-2"
             >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : btnText}
+                {loading ? <Loader2 className="animate-spin" size={18} /> : <span className="notranslate" translate="no">{btnText}</span>}
             </button>
             {/* Forget Password Link ONLY for Login Pwd Screen */}
             {onForgotPassword && (

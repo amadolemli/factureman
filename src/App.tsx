@@ -35,6 +35,7 @@ import { VerifyDocument } from './components/VerifyDocument';
 import DiagnosticsPage from './components/DiagnosticsPage';
 
 import { PullToRefresh } from './components/PullToRefresh';
+import DebugLogger from './components/DebugLogger';
 
 const App: React.FC = () => {
   // ROUTING HACK: Simple manual routing for Verification Page
@@ -1800,6 +1801,7 @@ const App: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen pb-20 md:pb-0 font-sans text-gray-900 selection:bg-blue-100 selection:text-blue-900">
       <PullToRefresh />
+      <DebugLogger />
       <input type="file" ref={fileInputRef} onChange={handleScan} accept="image/*,application/pdf" className="hidden" />
 
       {/* HEADER */}
