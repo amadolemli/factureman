@@ -75,7 +75,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           return (
             <div
               key={index}
-              className="bg-white p-6 md:p-8 max-w-3xl mx-auto border-2 border-gray-800 shadow-xl relative min-h-[29.6cm] flex flex-col print:shadow-none print:border-0 print:m-0 print:w-full print:break-after-page"
+              className="bg-white p-6 md:p-8 w-full max-w-[850px] mx-auto border-2 border-gray-800 shadow-xl relative min-h-[29.6cm] flex flex-col print:shadow-none print:border-0 print:m-0 print:w-full print:break-after-page"
               style={{ pageBreakAfter: isLastPage ? 'auto' : 'always' }}
             >
               {/* HEADER (Repeated) */}
@@ -280,7 +280,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           return (
             <div
               key={index}
-              className="bg-white max-w-3xl mx-auto shadow-2xl relative min-h-[29.6cm] flex flex-col font-sans print:shadow-none text-slate-800 print:break-after-page"
+              className="bg-white w-full max-w-[850px] mx-auto shadow-2xl relative min-h-[29.6cm] flex flex-col font-sans print:shadow-none text-slate-800 print:break-after-page"
               style={{ pageBreakAfter: isLastPage ? 'auto' : 'always' }}
             >
               {/* MODERN HEADER (Repeated) */}
@@ -402,7 +402,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           const isLastPage = index === pages.length - 1;
 
           return (
-            <div key={index} className="bg-white p-12 max-w-3xl mx-auto shadow-xl relative min-h-[29.6cm] flex flex-col font-serif text-gray-900 print:shadow-none print:m-0 print:border-0 print:break-after-page" style={{ fontFamily: 'Georgia, "Times New Roman", Times, serif', pageBreakAfter: isLastPage ? 'auto' : 'always' }}>
+            <div key={index} className="bg-white p-12 w-full max-w-[850px] mx-auto shadow-xl relative min-h-[29.6cm] flex flex-col font-serif text-gray-900 print:shadow-none print:m-0 print:border-0 print:break-after-page" style={{ fontFamily: 'Georgia, "Times New Roman", Times, serif', pageBreakAfter: isLastPage ? 'auto' : 'always' }}>
               {/* HEADER REPEATED */}
               <div className="text-center mb-8 pb-4 border-b border-gray-300 px-4">
                 {data.business.customHeaderImage ? (

@@ -679,7 +679,7 @@ const App: React.FC = () => {
             margin: 0,
             filename: `DOC_${backgroundPdfDoc.number}.pdf`,
             image: { type: 'jpeg' as const, quality: 0.98 },
-            html2canvas: { scale: window.innerWidth < 768 ? 1 : 2, useCORS: true },
+            html2canvas: { scale: 2, useCORS: true, windowWidth: 900 },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
           };
 
@@ -1506,9 +1506,9 @@ const App: React.FC = () => {
       setTimeout(() => setShowSuccessToast(false), 3000);
 
       html2canvas(invoiceElement, {
-        scale: 1.5,
+        scale: 2,
         useCORS: true,
-        windowWidth: 1200,
+        windowWidth: 900,
         backgroundColor: '#ffffff'
       }).then(async canvas => {
         const imgData = canvas.toDataURL('image/jpeg', 0.8);
