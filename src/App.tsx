@@ -1524,8 +1524,15 @@ const App: React.FC = () => {
         let heightLeft = imgHeight;
         let position = 0;
 
-        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
-        heightLeft -= pageHeight;
+        // Force single page if close enough
+        if (heightLeft > pageHeight && heightLeft < pageHeight + 20) {
+          const scaleFactor = pageHeight / heightLeft;
+          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, imgHeight * scaleFactor);
+          heightLeft = 0; // Done
+        } else {
+          pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
 
         while (heightLeft > 5) { // Tolerance of 5mm to avoid blank pages from sub-pixel overflow
           position = position - pageHeight;
