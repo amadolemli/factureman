@@ -280,9 +280,10 @@ const AuthScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                 throw new Error("Compte bloqué.");
             }
 
+            console.log("Login Success. User ID:", data.user.id);
             onLogin();
         } catch (err: any) {
-            console.error(err);
+            console.error("Login Error:", err);
             setError(err.message || "Erreur de connexion.");
         } finally {
             setLoading(false);

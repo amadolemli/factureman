@@ -68,10 +68,21 @@ BEGIN
     new_referral_code := new_referral_code || substr(chars, floor(random() * length(chars) + 1)::integer, 1);
   END LOOP;
 
-  -- Find Referrer (Handle empty/null)
+  -- Find Referrer (Strictly Case Insensitive)
   ref_code := NULLIF(TRIM(new.raw_user_meta_data->>'referral_code'), '');
   IF ref_code IS NOT NULL THEN
-      SELECT id INTO referrer_id FROM public.profiles WHERE referral_code = ref_code LIMIT 1;
+      SELECT id INTO referrer_id 
+      FROM public.profiles 
+      WHERE UPPER(referral_code) = UPPER(ref_code) 
+      LIMIT 1;
+      
+      IF referrer_id IS NOT NULL THEN
+          INSERT INTO public.debug_logs (process_name, message, details)
+          VALUES ('handle_new_user', 'REFERRER_LINKED', jsonb_build_object('user_id', new.id, 'referrer_id', referrer_id, 'code', ref_code));
+      ELSE
+          INSERT INTO public.debug_logs (process_name, message, details)
+          VALUES ('handle_new_user', 'REFERRER_NOT_FOUND', jsonb_build_object('user_id', new.id, 'code', ref_code));
+      END IF;
   END IF;
 
   -- Create Profile (app_credits = 0)
@@ -79,12 +90,23 @@ BEGIN
       id, business_name, app_credits, referral_code, referred_by, bonuses_claimed
   )
   VALUES (
-      new.id, 'Ma Nouvelle Boutique', 0, new_referral_code, referrer_id, false
+      new.id, 
+      'Ma Nouvelle Boutique', 
+      0, 
+      new_referral_code, 
+      referrer_id, 
+      false
   );
+
+  INSERT INTO public.debug_logs (process_name, message, details)
+  VALUES ('handle_new_user', 'PROFILE_CREATED', jsonb_build_object('user_id', new.id, 'ref_code', new_referral_code));
 
   RETURN new;
 EXCEPTION WHEN OTHERS THEN
   -- Fallback: Create minimal profile so user isn't locked out
+  INSERT INTO public.debug_logs (process_name, message, details)
+  VALUES ('handle_new_user', 'CRITICAL_FALLBACK', jsonb_build_object('user_id', new.id, 'error', SQLERRM));
+  
   INSERT INTO public.profiles (id, business_name, app_credits, bonuses_claimed)
   VALUES (new.id, 'Erreur Creation', 0, false);
   RETURN new;
