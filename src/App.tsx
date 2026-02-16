@@ -1527,7 +1527,7 @@ const App: React.FC = () => {
         pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
         heightLeft -= pageHeight;
 
-        while (heightLeft > 0) {
+        while (heightLeft > 5) { // Tolerance of 5mm to avoid blank pages from sub-pixel overflow
           position = position - pageHeight;
           pdf.addPage();
           pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);

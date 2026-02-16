@@ -75,7 +75,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           return (
             <div
               key={index}
-              className="bg-white p-6 md:p-8 max-w-2xl mx-auto border-2 border-gray-800 shadow-xl relative min-h-[29.7cm] flex flex-col print:shadow-none print:border-0 print:m-0 print:w-full print:break-after-page"
+              className="bg-white p-6 md:p-8 max-w-2xl mx-auto border-2 border-gray-800 shadow-xl relative min-h-[29.6cm] flex flex-col print:shadow-none print:border-0 print:m-0 print:w-full print:break-after-page"
               style={{ pageBreakAfter: isLastPage ? 'auto' : 'always' }}
             >
               {/* HEADER (Repeated) */}
@@ -233,7 +233,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
               {isLastPage && (
                 <div className="mt-8 flex justify-between items-end text-[10px] font-black uppercase">
                   <div className="text-center">Signature du Client<div className="h-16"></div>...................</div>
-                  {!isFinalized && (
+                  {isFinalized && (
                     <div className="flex flex-col items-center opacity-80 mx-4">
                       <div className="bg-white p-1 border border-gray-200"><QRCode value={verifyUrl} size={48} /></div>
                       <p className="text-[6px] font-bold mt-1 tracking-wider text-gray-500">AUTHENTIQUE</p>
@@ -280,7 +280,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           return (
             <div
               key={index}
-              className="bg-white max-w-2xl mx-auto shadow-2xl relative min-h-[29.7cm] flex flex-col font-sans print:shadow-none text-slate-800 print:break-after-page"
+              className="bg-white max-w-2xl mx-auto shadow-2xl relative min-h-[29.6cm] flex flex-col font-sans print:shadow-none text-slate-800 print:break-after-page"
               style={{ pageBreakAfter: isLastPage ? 'auto' : 'always' }}
             >
               {/* MODERN HEADER (Repeated) */}
@@ -382,7 +382,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
                 <div className="p-8 mt-auto">
                   <div className="border-t border-slate-100 pt-6 flex justify-between items-end text-[10px] text-slate-400 font-medium uppercase">
                     <div className="w-1/3"><p className="mb-8">Signature Client</p><div className="w-24 h-6 border-b border-dashed border-slate-300"></div></div>
-                    <div className="w-1/3 flex justify-center pb-2">{!isFinalized && <div className="block opacity-60"><QRCode value={verifyUrl} size={42} /></div>}</div>
+                    <div className="w-1/3 flex justify-center pb-2">{isFinalized && <div className="block opacity-60"><QRCode value={verifyUrl} size={42} /></div>}</div>
                     <div className="w-1/3 text-right"><p className="mb-8">Signature {data.business.name}</p>{data.business.signatureUrl ? <div className="w-24 h-12 ml-auto flex justify-end"><img src={data.business.signatureUrl} className="h-full object-contain" /></div> : <div className="w-24 h-6 border-b border-dashed border-slate-300 ml-auto"></div>}</div>
                   </div>
                 </div>
@@ -402,7 +402,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
           const isLastPage = index === pages.length - 1;
 
           return (
-            <div key={index} className="bg-white p-12 max-w-2xl mx-auto shadow-xl relative min-h-[29.7cm] flex flex-col font-serif text-gray-900 print:shadow-none print:m-0 print:border-0 print:break-after-page" style={{ fontFamily: 'Georgia, "Times New Roman", Times, serif', pageBreakAfter: isLastPage ? 'auto' : 'always' }}>
+            <div key={index} className="bg-white p-12 max-w-2xl mx-auto shadow-xl relative min-h-[29.6cm] flex flex-col font-serif text-gray-900 print:shadow-none print:m-0 print:border-0 print:break-after-page" style={{ fontFamily: 'Georgia, "Times New Roman", Times, serif', pageBreakAfter: isLastPage ? 'auto' : 'always' }}>
               {/* HEADER REPEATED */}
               <div className="text-center mb-8 pb-4 border-b border-gray-300 px-4">
                 {data.business.customHeaderImage ? (
@@ -469,7 +469,7 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
                 <div className="mt-auto px-4 md:px-12 pb-8 pt-6">
                   <div className="flex justify-between items-end mb-8 text-xs font-serif italic text-gray-500">
                     <div className="w-1/3"><p className="mb-8">Pour accord,</p><div className="w-32 h-px bg-gray-300"></div></div>
-                    <div className="w-1/3 flex justify-center pb-2">{!isFinalized && <div className="opacity-70 mb-1"><QRCode value={verifyUrl} size={48} /></div>}</div>
+                    <div className="w-1/3 flex justify-center pb-2">{isFinalized && <div className="opacity-70 mb-1"><QRCode value={verifyUrl} size={48} /></div>}</div>
                     <div className="w-1/3 text-right"><p className="mb-8">La Direction,</p>{data.business.signatureUrl ? <div className="w-32 h-16 ml-auto flex justify-end mb-[-10px]"><img src={data.business.signatureUrl} className="h-full object-contain" /></div> : <div className="w-32 h-px bg-gray-300 ml-auto"></div>}</div>
                   </div>
                 </div>
