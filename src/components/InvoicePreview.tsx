@@ -128,18 +128,18 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
 
               {/* WATERMARKS (Repeated) */}
               {!isFinalized && (
-                <div className="absolute inset-0 flex items-center justify-center p-10 pointer-events-none opacity-20 overflow-hidden z-0">
-                  <p className="text-9xl font-black text-gray-400 -rotate-45 whitespace-nowrap select-none border-8 border-gray-400 p-10 rounded-[3rem]">BROUILLON</p>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.08] overflow-hidden z-0">
+                  <p className="text-[120px] font-black text-gray-400 -rotate-45 whitespace-nowrap select-none border-[12px] border-gray-400 p-16 rounded-[4rem]">BROUILLON</p>
                 </div>
               )}
               {isFinalized && data.type === DocumentType.INVOICE && amountPaid < subtotal && (
-                <div className="absolute inset-0 flex items-center justify-center p-10 pointer-events-none opacity-20 overflow-hidden z-0">
-                  <p className="text-9xl font-black text-red-500 -rotate-45 whitespace-nowrap select-none border-8 border-red-500 p-10 rounded-[3rem]">IMPAYÉ</p>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.08] overflow-hidden z-0">
+                  <p className="text-[120px] font-black text-red-600 -rotate-45 whitespace-nowrap select-none border-[12px] border-red-600 p-16 rounded-[4rem]">IMPAYÉ</p>
                 </div>
               )}
               {isFinalized && data.type === DocumentType.INVOICE && amountPaid >= subtotal && subtotal > 0 && (
-                <div className="absolute inset-0 flex items-center justify-center p-10 pointer-events-none opacity-20 overflow-hidden z-0">
-                  <p className="text-9xl font-black text-green-600 -rotate-45 whitespace-nowrap select-none border-8 border-green-600 p-10 rounded-[3rem]">PAYÉ</p>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.08] overflow-hidden z-0">
+                  <p className="text-[120px] font-black text-green-600 -rotate-45 whitespace-nowrap select-none border-[12px] border-green-600 p-16 rounded-[4rem]">PAYÉ</p>
                 </div>
               )}
 
@@ -375,7 +375,21 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
               </div>
 
               {/* WATERMARKS REPEATED */}
-              {!isFinalized && <div className="absolute inset-0 flex items-center justify-center p-10 pointer-events-none opacity-20 overflow-hidden z-0"><p className="text-9xl font-black text-gray-400 -rotate-45 whitespace-nowrap select-none border-8 border-gray-400 p-10 rounded-[3rem]">BROUILLON</p></div>}
+              {!isFinalized && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] overflow-hidden z-0">
+                  <p className="text-[120px] font-black text-slate-400 -rotate-45 whitespace-nowrap select-none border-[12px] border-slate-400 p-16 rounded-[4rem]">BROUILLON</p>
+                </div>
+              )}
+              {isFinalized && data.type === DocumentType.INVOICE && amountPaid < subtotal && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] overflow-hidden z-0">
+                  <p className="text-[120px] font-black text-red-600 -rotate-45 whitespace-nowrap select-none border-[12px] border-red-600 p-16 rounded-[4rem]">IMPAYÉ</p>
+                </div>
+              )}
+              {isFinalized && data.type === DocumentType.INVOICE && amountPaid >= subtotal && subtotal > 0 && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] overflow-hidden z-0">
+                  <p className="text-[120px] font-black text-emerald-600 -rotate-45 whitespace-nowrap select-none border-[12px] border-emerald-600 p-16 rounded-[4rem]">PAYÉ</p>
+                </div>
+              )}
 
               {/* FOOTER (LAST PAGE) */}
               {isLastPage ? (
@@ -430,7 +444,21 @@ const InvoicePreview: React.FC<Props> = ({ data, remainingBalance }) => {
               </div>
 
               {/* WATERMARKS */}
-              {!isFinalized && <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 z-0"><p className="text-[120px] font-bold text-gray-400 -rotate-45 whitespace-nowrap select-none border-[12px] border-gray-400 p-12 rounded-[3rem]">BROUILLON</p></div>}
+              {!isFinalized && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] overflow-hidden z-0">
+                  <p className="text-[120px] font-black text-gray-300 -rotate-45 whitespace-nowrap select-none border-[12px] border-gray-300 p-16 rounded-[4rem]">BROUILLON</p>
+                </div>
+              )}
+              {isFinalized && data.type === DocumentType.INVOICE && amountPaid < subtotal && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] overflow-hidden z-0">
+                  <p className="text-[120px] font-black text-red-600 -rotate-45 whitespace-nowrap select-none border-[12px] border-red-600 p-16 rounded-[4rem]">IMPAYÉ</p>
+                </div>
+              )}
+              {isFinalized && data.type === DocumentType.INVOICE && amountPaid >= subtotal && subtotal > 0 && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] overflow-hidden z-0">
+                  <p className="text-[120px] font-black text-green-600 -rotate-45 whitespace-nowrap select-none border-[12px] border-green-600 p-16 rounded-[4rem]">PAYÉ</p>
+                </div>
+              )}
 
               {/* TABLE (Chunked) - Added flex flex-col to push text down */}
               <div className="flex-grow z-10 flex flex-col">
